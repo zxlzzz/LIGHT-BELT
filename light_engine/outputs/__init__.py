@@ -5,7 +5,7 @@ Provides a unified LightOutput interface and concrete implementations:
 - JsonOutput: writes frames as JSON Lines (debugging)
 - SimulatorOutput: feeds the simulator
 - UdpOutput: sends binary packets via UDP (ESP32-S3)
-- SerialOutput: sends RGBW commands via serial (STM32)
+- SerialOutput: sends legacy RGBW commands via serial (STM32)
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ class LightOutput(ABC):
         """Return capabilities of this output."""
         return {
             "type": self.__class__.__name__,
-            "supports_rgbw": False,
+            "supports_rgbcct": False,
             "supports_digital": False,
             "max_pixels": 0,
         }

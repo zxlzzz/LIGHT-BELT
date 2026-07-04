@@ -6,6 +6,7 @@ from light_engine.color import (
     rgb_to_hsv,
     hsv_to_rgb,
     rgb_to_rgbw,
+    rgb_to_rgbcct,
     gamma_correct,
     gamma_decode,
     perceptual_brightness,
@@ -77,6 +78,47 @@ class TestRGBW:
     def test_rejects_nan(self):
         with pytest.raises(ValueError):
             rgb_to_rgbw(float('nan'), 0.5, 0.5)
+
+
+class TestRGBCCT:
+    def test_black_outputs_all_zero(self):
+        c = rgb_to_rgbcct(0.0, 0.0, 0.0)
+        assert c.r == 0.0
+        assert c.g == 0.0
+        assert c.b == 0.0
+        assert c.warm_white == 0.0
+        assert c.cool_white == 0.0
+
+    def test_saturated_primaries_use_rgb(self):
+        for rgb in [(1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)]:
+            c = rgb_to_rgbcct(*rgb)
+            assert c.warm_white < 0.01
+            assert c.cool_white < 0.01
+            assert max(c.r, c.g, c.b) > 0.9
+
+    def test_neutral_white_uses_warm_and_cool_white(self):
+        c = rgb_to_rgbcct(0.8, 0.8, 0.8)
+        assert c.warm_white > 0.0
+        assert c.cool_white > 0.0
+
+    def test_warm_white_prefers_warm_channel(self):
+        c = rgb_to_rgbcct(1.0, 0.82, 0.55)
+        assert c.warm_white > c.cool_white
+
+    def test_cool_white_prefers_cool_channel(self):
+        c = rgb_to_rgbcct(0.55, 0.75, 1.0)
+        assert c.cool_white > c.warm_white
+
+    def test_power_limit_caps_channel_sum(self):
+        c = rgb_to_rgbcct(1.0, 1.0, 1.0, power_limit=0.75)
+        total = c.r + c.g + c.b + c.warm_white + c.cool_white
+        assert total <= 0.75 + 1e-9
+
+    def test_rejects_invalid_input(self):
+        with pytest.raises(ValueError):
+            rgb_to_rgbcct(float("nan"), 0.0, 0.0)
+        with pytest.raises(ValueError):
+            rgb_to_rgbcct(0.0, -0.1, 0.0)
 
 
 class TestGamma:

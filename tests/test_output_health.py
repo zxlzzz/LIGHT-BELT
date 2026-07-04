@@ -1,4 +1,4 @@
-"""Regression tests for Phase 0 output health and RGBW validation bugs."""
+"""Regression tests for output health and RGB+CCT validation bugs."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from collections import deque
 import pytest
 
 import light_engine.outputs.serial_output as serial_module
-from light_engine.models import DigitalStrip, PixelFrame, RGBWColor, ZoneOutput
+from light_engine.models import DigitalStrip, PixelFrame, RGBCCTColor, ZoneOutput
 from light_engine.outputs import send_all
 from light_engine.outputs.serial_output import SerialOutput, SerialStreamParser
 from light_engine.outputs.udp_output import MAX_PIXELS_PER_PACKET, UdpOutput
@@ -20,7 +20,9 @@ def _zone_frame(zone_count: int = 1) -> PixelFrame:
         zones=[
             ZoneOutput(
                 zone_id=f"zone_{idx}",
-                color=RGBWColor(r=0.1, g=0.2, b=0.3, w=0.4, brightness=0.5),
+                color=RGBCCTColor(
+                    r=0.1, g=0.2, b=0.3, warm_white=0.4, cool_white=0.2
+                ),
             )
             for idx in range(zone_count)
         ],
@@ -150,8 +152,6 @@ def test_serial_writer_updates_packet_health_without_type_error(monkeypatch: pyt
 
 def test_serial_encode_failure_does_not_count_complete_logical_frame() -> None:
     class BadColor:
-        brightness = 1.0
-
         def to_uint8(self) -> dict[str, int]:
             raise ValueError("bad color")
 
@@ -159,7 +159,10 @@ def test_serial_encode_failure_does_not_count_complete_logical_frame() -> None:
     frame = PixelFrame(
         timestamp=0.0,
         zones=[
-            ZoneOutput(zone_id="ok", color=RGBWColor(r=0.1, g=0.2, b=0.3, w=0.4)),
+            ZoneOutput(
+                zone_id="ok",
+                color=RGBCCTColor(r=0.1, g=0.2, b=0.3, warm_white=0.4),
+            ),
             ZoneOutput(zone_id="bad", color=BadColor()),  # type: ignore[arg-type]
         ],
     )
@@ -173,30 +176,43 @@ def test_serial_encode_failure_does_not_count_complete_logical_frame() -> None:
     assert len(output._write_queue) == 0
 
 
-@pytest.mark.parametrize("channel", ["r", "g", "b", "w"])
+@pytest.mark.parametrize("channel", ["r", "g", "b", "warm_white", "cool_white"])
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
-def test_rgbw_color_rejects_non_finite_channels(channel: str, value: float) -> None:
-    kwargs = {"r": 0.1, "g": 0.2, "b": 0.3, "w": 0.4}
+def test_rgbcct_color_rejects_non_finite_channels(channel: str, value: float) -> None:
+    kwargs = {
+        "r": 0.1,
+        "g": 0.2,
+        "b": 0.3,
+        "warm_white": 0.4,
+        "cool_white": 0.2,
+    }
     kwargs[channel] = value
 
     with pytest.raises(ValueError, match=channel):
-        RGBWColor(**kwargs)
+        RGBCCTColor(**kwargs)
 
 
-@pytest.mark.parametrize("channel", ["r", "g", "b", "w"])
+@pytest.mark.parametrize("channel", ["r", "g", "b", "warm_white", "cool_white"])
 @pytest.mark.parametrize("value", [-0.01, 1.01])
-def test_rgbw_color_rejects_out_of_range_channels(channel: str, value: float) -> None:
-    kwargs = {"r": 0.1, "g": 0.2, "b": 0.3, "w": 0.4}
+def test_rgbcct_color_rejects_out_of_range_channels(channel: str, value: float) -> None:
+    kwargs = {
+        "r": 0.1,
+        "g": 0.2,
+        "b": 0.3,
+        "warm_white": 0.4,
+        "cool_white": 0.2,
+    }
     kwargs[channel] = value
 
     with pytest.raises(ValueError, match=channel):
-        RGBWColor(**kwargs)
+        RGBCCTColor(**kwargs)
 
 
-def test_rgbw_color_preserves_valid_channels_individually() -> None:
-    color = RGBWColor(r=0.1, g=0.2, b=0.3, w=0.4)
+def test_rgbcct_color_preserves_valid_channels_individually() -> None:
+    color = RGBCCTColor(r=0.1, g=0.2, b=0.3, warm_white=0.4, cool_white=0.2)
 
     assert color.r == 0.1
     assert color.g == 0.2
     assert color.b == 0.3
-    assert color.w == 0.4
+    assert color.warm_white == 0.4
+    assert color.cool_white == 0.2

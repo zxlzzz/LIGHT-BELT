@@ -16,13 +16,13 @@ import math
 import random
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.mapping.resolve import resolve_video_color
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 from light_engine.util import AttackReleaseEnvelope, ColorSmoother
@@ -67,7 +67,6 @@ class VideoAudioFusionEffect(BaseEffect):
             target_brightness = max(target_brightness, video_brightness * 0.3)
 
         bri = self._brightness_env.update(target_brightness, ctx.delta_time)
-        bri *= ctx.global_brightness
 
         # ---- Bass pulse ----
         bass_pulse = self._bass_env.update(bass * self._bass_boost, ctx.delta_time)
@@ -131,7 +130,7 @@ class VideoAudioFusionEffect(BaseEffect):
             strips.append(DigitalStrip(strip_id=sid, pixel_count=n, pixels=pixels))
 
         # ============================================================
-        # RGBW zones: each zone uses its own video_zone color
+        # RGB+CCT zones: each zone uses its own video_zone color
         # ============================================================
         zones = []
         for zd in ctx.mode_parameters.get("zone_defs", []):
@@ -145,10 +144,7 @@ class VideoAudioFusionEffect(BaseEffect):
             zone_bri = bri + bass_pulse * 0.2
             zones.append(ZoneOutput(
                 zone_id=zid,
-                color=RGBWColor(
-                    r=zr * zone_bri, g=zg * zone_bri, b=zb * zone_bri,
-                    w=0.0, brightness=zone_bri,
-                ),
+                color=rgb_to_rgbcct(zr * zone_bri, zg * zone_bri, zb * zone_bri),
             ))
 
         zone_mapping = {}

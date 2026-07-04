@@ -40,11 +40,11 @@ class JsonOutput(LightOutput):
             "zones": [
                 {
                     "zone_id": z.zone_id,
-                    "r": round(z.color.r * 255),
-                    "g": round(z.color.g * 255),
-                    "b": round(z.color.b * 255),
-                    "w": round(z.color.w * 255),
-                    "brightness": round(z.color.brightness, 3),
+                    "r": z.color.to_uint8()["r"],
+                    "g": z.color.to_uint8()["g"],
+                    "b": z.color.to_uint8()["b"],
+                    "warm_white": z.color.to_uint8()["warm_white"],
+                    "cool_white": z.color.to_uint8()["cool_white"],
                 }
                 for z in frame.zones
             ],

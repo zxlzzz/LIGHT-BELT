@@ -1,4 +1,4 @@
-"""Serial/RS-485 output for STM32 RGBW zones.
+"""Serial/RS-485 output for STM32 analog zones.
 
 Frozen 11-byte protocol:
   [0x55] [CMD] [R] [G] [B] [W] [Brightness] [Fade_H] [Fade_L] [CheckSum] [0xAA]
@@ -8,7 +8,7 @@ CheckSum algorithm:
   (Byte1 = CMD, Byte8 = Fade_L)
 
 Brightness: 0-100
-RGBW: 0-255
+Legacy RGBW payload: 0-255
 Fade: 0-65535 (big-endian)
 Frame length: exactly 11 bytes
 """
@@ -46,7 +46,7 @@ def _compute_checksum(data: bytes) -> int:
 
 
 class SerialPacket:
-    """Encoded 11-byte serial packet for an RGBW zone.
+    """Encoded 11-byte serial packet for a legacy RGBW zone.
 
     Fixed format:
       [0x55] [CMD] [R] [G] [B] [W] [Brightness] [Fade_H] [Fade_L] [CheckSum] [0xAA]
@@ -224,7 +224,7 @@ class SerialStreamParser:
 
 
 class SerialOutput(LightOutput):
-    """Sends RGBW zone data via serial/RS-485 using 11-byte protocol.
+    """Sends analog zone data via serial/RS-485 using legacy 11-byte protocol.
 
     Actual serial communication is only attempted if pyserial is available.
     Falls back to memory transport for testing.
@@ -287,7 +287,7 @@ class SerialOutput(LightOutput):
         self._write_thread.start()
 
     def send_frame(self, frame: PixelFrame) -> None:
-        """Enqueue RGBW zone frames for writing."""
+        """Enqueue legacy RGBW zone frames for writing."""
         if not self._open or not self._running:
             return
 
@@ -295,15 +295,14 @@ class SerialOutput(LightOutput):
         for zone in frame.zones:
             try:
                 c = zone.color.to_uint8()
-                # Map brightness to 0-100
-                br = round(zone.color.brightness * MAX_BRIGHTNESS)
+                legacy_w = max(c["warm_white"], c["cool_white"])
                 packet = SerialPacket(
                     cmd=DEFAULT_CMD,
                     r=c["r"],
                     g=c["g"],
                     b=c["b"],
-                    w=c["w"],
-                    brightness=br,
+                    w=legacy_w,
+                    brightness=MAX_BRIGHTNESS,
                     fade_ms=0,
                 )
                 packets.append(packet.encode())
@@ -416,7 +415,8 @@ class SerialOutput(LightOutput):
     def capabilities(self) -> dict:
         caps = super().capabilities()
         caps.update({
-            "supports_rgbw": True,
+            "supports_rgbcct": True,
+            "legacy_payload": "rgbw",
             "protocol": "STM32 11-byte fixed frame v1",
             "checksum": "8-bit sum (not CRC)",
             "frame_length": FRAME_LENGTH,

@@ -15,12 +15,9 @@ from light_engine.mapping import Layout, ZoneDef
 from light_engine.media import AudioReader, VideoReader
 from light_engine.models import (
     AudioFeatures,
-    DigitalStrip,
     EffectContext,
     PixelFrame,
     VideoFeatures,
-    ZoneOutput,
-    RGBWColor,
 )
 from light_engine.outputs import (
     LightOutput,
@@ -29,6 +26,7 @@ from light_engine.outputs import (
     send_all,
     close_all,
 )
+from light_engine.outputs.transform import OutputTransform
 from light_engine.data.generators import SyntheticDataSource
 
 logger = logging.getLogger(__name__)
@@ -67,6 +65,9 @@ class Engine:
 
         # Outputs
         self._outputs: dict[str, LightOutput] = {}
+        self._output_transform = OutputTransform(
+            global_brightness=config.get("system.smoothing.max_brightness", 0.85)
+        )
 
         # State
         self._running = False
@@ -226,15 +227,13 @@ class Engine:
                     delta_time=frame_period,
                     video_features=self._latest_video,
                     audio_features=self._latest_audio,
-                    global_brightness=self._config.get(
-                        "system.smoothing.max_brightness", 0.85
-                    ),
                     mode_parameters={
                         "strip_defs": self._strip_defs,
                         "zone_defs": self._zone_defs,
                     },
                 )
                 frame = self._effect.process(ctx)
+                frame = self._output_transform.apply_to_frame(frame)
 
                 # Send to outputs
                 send_all(self._outputs, frame)

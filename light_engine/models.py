@@ -133,7 +133,6 @@ class EffectContext:
         delta_time: Time since last frame in seconds.
         video_features: Latest video analysis features (may be None).
         audio_features: Latest audio analysis features (may be None).
-        global_brightness: Global brightness multiplier in [0,1].
         speed: Global speed multiplier.
         intensity: Global intensity multiplier.
         mode_parameters: Effect-specific parameters dict.
@@ -143,7 +142,6 @@ class EffectContext:
     delta_time: float
     video_features: Optional[VideoFeatures] = None
     audio_features: Optional[AudioFeatures] = None
-    global_brightness: float = 1.0
     speed: float = 1.0
     intensity: float = 1.0
     mode_parameters: dict[str, Any] = field(default_factory=dict)
@@ -153,9 +151,6 @@ class EffectContext:
             raise ValueError(f"timestamp must be finite, got {self.timestamp}")
         if self.delta_time <= 0:
             raise ValueError(f"delta_time must be positive, got {self.delta_time}")
-        self.global_brightness = _validate_float(
-            self.global_brightness, "global_brightness"
-        )
         self.speed = _validate_float(self.speed, "speed", min_val=0.0, max_val=10.0)
         self.intensity = _validate_float(
             self.intensity, "intensity", min_val=0.0, max_val=10.0
@@ -163,32 +158,35 @@ class EffectContext:
 
 
 @dataclass
-class RGBWColor:
-    """Color for analog RGBW strips.
+class RGBCCTColor:
+    """Color for analog RGB+CCT zones.
 
-    Channels in [0,1] float internally.
+    Channels are [0,1] floats internally. Brightness is intentionally not
+    stored here; OutputTransform is the only global brightness application
+    point.
     """
 
     r: float = 0.0
     g: float = 0.0
     b: float = 0.0
-    w: float = 0.0
-    brightness: float = 1.0
+    warm_white: float = 0.0
+    cool_white: float = 0.0
 
     def __post_init__(self) -> None:
         self.r = _validate_float(self.r, "r")
         self.g = _validate_float(self.g, "g")
         self.b = _validate_float(self.b, "b")
-        self.w = _validate_float(self.w, "w")
-        self.brightness = _validate_float(self.brightness, "brightness")
+        self.warm_white = _validate_float(self.warm_white, "warm_white")
+        self.cool_white = _validate_float(self.cool_white, "cool_white")
 
     def to_uint8(self) -> dict[str, int]:
         """Convert to 0-255 integer representation."""
         return {
-            "r": round(self.r * self.brightness * 255),
-            "g": round(self.g * self.brightness * 255),
-            "b": round(self.b * self.brightness * 255),
-            "w": round(self.w * self.brightness * 255),
+            "r": round(self.r * 255),
+            "g": round(self.g * 255),
+            "b": round(self.b * 255),
+            "warm_white": round(self.warm_white * 255),
+            "cool_white": round(self.cool_white * 255),
         }
 
 
@@ -227,10 +225,10 @@ class DigitalStrip:
 
 @dataclass
 class ZoneOutput:
-    """Output for an analog RGBW zone."""
+    """Output for an analog RGB+CCT zone."""
 
     zone_id: str
-    color: RGBWColor = field(default_factory=RGBWColor)
+    color: RGBCCTColor = field(default_factory=RGBCCTColor)
 
 
 @dataclass
@@ -261,7 +259,10 @@ class PixelFrame:
                     return False
         for zone in self.zones:
             c = zone.color
-            if not is_valid_rgb(c.r, c.g, c.b) or not is_valid_rgb(c.w, c.w, c.w):
+            if (
+                not is_valid_rgb(c.r, c.g, c.b)
+                or not is_valid_rgb(c.warm_white, c.cool_white, 0.0)
+            ):
                 return False
         return True
 

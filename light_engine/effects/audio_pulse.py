@@ -1,12 +1,12 @@
 """AUDIO_PULSE effect - brightness follows music RMS energy."""
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 from light_engine.util import AttackReleaseEnvelope
@@ -31,7 +31,7 @@ class AudioPulseEffect(BaseEffect):
         if ctx.audio_features and not ctx.audio_features.silence:
             target = ctx.audio_features.rms * ctx.intensity
 
-        bri = self._env.update(target, ctx.delta_time) * ctx.global_brightness
+        bri = self._env.update(target, ctx.delta_time)
 
         r, g, b = self._color
         r, g, b = r * bri, g * bri, b * bri
@@ -47,7 +47,7 @@ class AudioPulseEffect(BaseEffect):
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zones.append(ZoneOutput(
                 zone_id=zd["id"],
-                color=RGBWColor(r=r, g=g, b=b, w=0.0, brightness=bri),
+                color=rgb_to_rgbcct(r, g, b),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

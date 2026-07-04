@@ -84,5 +84,5 @@ class SimulatorOutput(LightOutput):
 
     def capabilities(self) -> dict:
         caps = super().capabilities()
-        caps.update({"supports_rgbw": True, "supports_digital": True})
+        caps.update({"supports_rgbcct": True, "supports_digital": True})
         return caps

@@ -1,13 +1,13 @@
 """VIDEO_AMBIENT effect - strip colors follow video zone colors."""
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.mapping.resolve import resolve_video_color
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 from light_engine.util import ColorSmoother
@@ -33,7 +33,6 @@ class VideoAmbientEffect(BaseEffect):
         return self._smoothers[key]
 
     def process(self, ctx: EffectContext) -> PixelFrame:
-        bri = ctx.global_brightness
         vf = ctx.video_features
 
         # --- Digital strips ---
@@ -48,14 +47,14 @@ class VideoAmbientEffect(BaseEffect):
             sm = self._get_smoother(sid)
             r, g, b = sm.update(*base_rgb)
 
-            pixels = [(r * bri, g * bri, b * bri)] * n
+            pixels = [(r, g, b)] * n
             # Direction reverse: only for digital strips
             if direction == "reverse":
                 pixels = list(reversed(pixels))
 
             strips.append(DigitalStrip(strip_id=sid, pixel_count=n, pixels=pixels))
 
-        # --- RGBW zones ---
+        # --- RGB+CCT zones ---
         zones = []
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zid = zd["id"]
@@ -67,7 +66,7 @@ class VideoAmbientEffect(BaseEffect):
 
             zones.append(ZoneOutput(
                 zone_id=zid,
-                color=RGBWColor(r=r * bri, g=g * bri, b=b * bri, w=0.0, brightness=bri),
+                color=rgb_to_rgbcct(r, g, b),
             ))
 
         zone_mapping = {}

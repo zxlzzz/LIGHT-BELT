@@ -3,12 +3,12 @@
 import math
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 
@@ -30,7 +30,7 @@ class BreathEffect(BaseEffect):
     def process(self, ctx: EffectContext) -> PixelFrame:
         self._phase += ctx.delta_time
         t = (math.sin(2 * math.pi * self._phase / self._period) + 1) / 2
-        brightness = self._min + (1.0 - self._min) * t * ctx.global_brightness
+        brightness = self._min + (1.0 - self._min) * t
 
         r, g, b = self._color
         r, g, b = r * brightness, g * brightness, b * brightness
@@ -46,7 +46,7 @@ class BreathEffect(BaseEffect):
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zones.append(ZoneOutput(
                 zone_id=zd["id"],
-                color=RGBWColor(r=r, g=g, b=b, w=0.0, brightness=brightness),
+                color=rgb_to_rgbcct(r, g, b),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

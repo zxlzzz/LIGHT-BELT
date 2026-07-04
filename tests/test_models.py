@@ -9,7 +9,7 @@ from light_engine.models import (
     PixelFrame,
     DigitalStrip,
     ZoneOutput,
-    RGBWColor,
+    RGBCCTColor,
     clamp_rgb,
     is_valid_rgb,
 )
@@ -90,9 +90,8 @@ class TestAudioFeatures:
 
 class TestEffectContext:
     def test_valid(self):
-        ctx = EffectContext(timestamp=1.0, delta_time=0.033, global_brightness=0.8)
+        ctx = EffectContext(timestamp=1.0, delta_time=0.033)
         assert ctx.timestamp == 1.0
-        assert ctx.global_brightness == 0.8
 
     def test_rejects_zero_delta(self):
         with pytest.raises(ValueError):
@@ -130,15 +129,27 @@ class TestDigitalStrip:
         assert uint8 == [(255, 128, 0)]
 
 
-class TestRGBWColor:
+class TestRGBCCTColor:
     def test_default(self):
-        c = RGBWColor()
-        assert c.r == 0.0 and c.g == 0.0 and c.b == 0.0 and c.w == 0.0
+        c = RGBCCTColor()
+        assert c.r == 0.0
+        assert c.g == 0.0
+        assert c.b == 0.0
+        assert c.warm_white == 0.0
+        assert c.cool_white == 0.0
 
     def test_to_uint8(self):
-        c = RGBWColor(r=1.0, g=0.5, b=0.0, w=0.0, brightness=1.0)
+        c = RGBCCTColor(
+            r=1.0, g=0.5, b=0.0, warm_white=0.25, cool_white=0.125
+        )
         u = c.to_uint8()
-        assert u == {"r": 255, "g": 128, "b": 0, "w": 0}
+        assert u == {
+            "r": 255,
+            "g": 128,
+            "b": 0,
+            "warm_white": 64,
+            "cool_white": 32,
+        }
 
 
 class TestPixelFrame:

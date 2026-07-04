@@ -1,4 +1,4 @@
-"""Color conversion utilities: RGB, HSV, RGBW, gamma, interpolation."""
+"""Color conversion utilities: RGB, HSV, RGB+CCT, RGBW, gamma, interpolation."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ from enum import Enum
 from typing import Tuple
 
 import numpy as np
+
+from light_engine.models import RGBCCTColor
 
 
 class WhiteStrategy(Enum):
@@ -110,6 +112,82 @@ def rgb_to_rgbw(
 
     else:
         raise ValueError(f"Unknown white strategy: {strategy}")
+
+
+def rgb_to_rgbcct(
+    r: float,
+    g: float,
+    b: float,
+    *,
+    warm_bias: float = 1.0,
+    cool_bias: float = 1.0,
+    white_strength: float = 0.8,
+    power_limit: float = 1.0,
+) -> RGBCCTColor:
+    """Map RGB color to RGB+CCT channels for analog COB zones.
+
+    This is a visual mapping strategy, not a real color-temperature recovery
+    algorithm. Saturated colors stay mainly RGB; neutral colors extract a
+    configurable white component split between warm and cool white.
+    """
+    r, g, b = float(r), float(g), float(b)
+    for ch, name in [(r, "r"), (g, "g"), (b, "b")]:
+        if math.isnan(ch) or math.isinf(ch) or ch < 0.0 or ch > 1.0:
+            raise ValueError(f"RGB channel '{name}' must be in [0,1], got {ch}")
+
+    for value, name in [
+        (warm_bias, "warm_bias"),
+        (cool_bias, "cool_bias"),
+        (white_strength, "white_strength"),
+        (power_limit, "power_limit"),
+    ]:
+        if math.isnan(value) or math.isinf(value):
+            raise ValueError(f"{name} must be finite, got {value}")
+
+    warm_bias = max(0.0, float(warm_bias))
+    cool_bias = max(0.0, float(cool_bias))
+    white_strength = max(0.0, min(1.0, float(white_strength)))
+    power_limit = max(0.0, float(power_limit))
+    if power_limit == 0.0:
+        return RGBCCTColor()
+
+    max_c = max(r, g, b)
+    min_c = min(r, g, b)
+    if max_c <= 0.0 or white_strength <= 0.0:
+        return RGBCCTColor(r=r, g=g, b=b)
+
+    saturation = (max_c - min_c) / max_c
+    white_total = min_c * (1.0 - saturation) * white_strength
+    white_total = max(0.0, min(1.0, white_total))
+
+    residual_r = max(0.0, r - white_total)
+    residual_g = max(0.0, g - white_total)
+    residual_b = max(0.0, b - white_total)
+
+    cool_fraction = max(0.0, min(1.0, 0.5 + (b - r) * 0.5))
+    warm_weight = (1.0 - cool_fraction) * warm_bias
+    cool_weight = cool_fraction * cool_bias
+    total_weight = warm_weight + cool_weight
+    if total_weight > 0.0:
+        warm_white = white_total * warm_weight / total_weight
+        cool_white = white_total * cool_weight / total_weight
+    else:
+        warm_white = 0.0
+        cool_white = 0.0
+
+    channels = [residual_r, residual_g, residual_b, warm_white, cool_white]
+    total_output = sum(channels)
+    if power_limit > 0.0 and total_output > power_limit:
+        scale = power_limit / total_output
+        channels = [ch * scale for ch in channels]
+
+    return RGBCCTColor(
+        r=channels[0],
+        g=channels[1],
+        b=channels[2],
+        warm_white=channels[3],
+        cool_white=channels[4],
+    )
 
 
 def gamma_correct(r: float, g: float, b: float, gamma: float = 2.2) -> Tuple[float, float, float]:

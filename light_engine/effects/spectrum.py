@@ -3,12 +3,12 @@
 import colorsys
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 from light_engine.util import AttackReleaseEnvelope
@@ -36,9 +36,9 @@ class SpectrumEffect(BaseEffect):
             mid = ctx.audio_features.mid
             treble = ctx.audio_features.treble
 
-        bass_bri = self._bass_env.update(bass, ctx.delta_time) * ctx.global_brightness
-        mid_bri = self._mid_env.update(mid, ctx.delta_time) * ctx.global_brightness
-        treble_bri = self._treble_env.update(treble, ctx.delta_time) * ctx.global_brightness
+        bass_bri = self._bass_env.update(bass, ctx.delta_time)
+        mid_bri = self._mid_env.update(mid, ctx.delta_time)
+        treble_bri = self._treble_env.update(treble, ctx.delta_time)
 
         # Colors: bass=red, mid=green, treble=blue
         band_colors = {
@@ -78,7 +78,7 @@ class SpectrumEffect(BaseEffect):
                 cr, cg, cb, bri = 0.0, 0.0, 0.0, 0.0
             zones.append(ZoneOutput(
                 zone_id=zid,
-                color=RGBWColor(r=cr * bri, g=cg * bri, b=cb * bri, w=0.0, brightness=bri),
+                color=rgb_to_rgbcct(cr * bri, cg * bri, cb * bri),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones,

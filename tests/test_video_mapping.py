@@ -1,4 +1,4 @@
-"""Tests for video zone mapping, direction reverse, and RGBW W channel."""
+"""Tests for video zone mapping, direction reverse, and RGB+CCT channels."""
 
 import numpy as np
 import pytest
@@ -106,7 +106,7 @@ class TestLayoutZoneVideoZone:
         z = ZoneDef(id="test")
         assert z.video_zone == "center"
 
-    def test_rgbw_zones_have_direction(self):
+    def test_rgbcct_zones_have_direction(self):
         Config.reset()
         layout = Layout.from_config()
         for z in layout.zones:
@@ -131,26 +131,30 @@ class TestDirection:
         assert reversed_pixels == [(0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (1.0, 0.0, 0.0)]
 
 
-class TestRGBWChannel:
-    def test_conversion_exists_and_produces_w(self):
-        from light_engine.color import rgb_to_rgbw, WhiteStrategy
-        r, g, b, w = rgb_to_rgbw(0.5, 0.5, 0.5, WhiteStrategy.DESATURATE)
-        assert w > 0.0, "Gray should produce white channel"
+class TestRGBCCTChannel:
+    def test_conversion_exists_and_produces_warm_and_cool_white(self):
+        from light_engine.color import rgb_to_rgbcct
+        c = rgb_to_rgbcct(0.5, 0.5, 0.5)
+        assert c.warm_white > 0.0
+        assert c.cool_white > 0.0
 
     def test_pure_red_no_white(self):
-        from light_engine.color import rgb_to_rgbw, WhiteStrategy
-        r, g, b, w = rgb_to_rgbw(1.0, 0.0, 0.0, WhiteStrategy.DESATURATE)
-        assert w < 0.1
+        from light_engine.color import rgb_to_rgbcct
+        c = rgb_to_rgbcct(1.0, 0.0, 0.0)
+        assert c.warm_white < 0.1
+        assert c.cool_white < 0.1
 
     def test_pure_green_no_white(self):
-        from light_engine.color import rgb_to_rgbw, WhiteStrategy
-        r, g, b, w = rgb_to_rgbw(0.0, 1.0, 0.0, WhiteStrategy.DESATURATE)
-        assert w < 0.1
+        from light_engine.color import rgb_to_rgbcct
+        c = rgb_to_rgbcct(0.0, 1.0, 0.0)
+        assert c.warm_white < 0.1
+        assert c.cool_white < 0.1
 
     def test_pure_blue_no_white(self):
-        from light_engine.color import rgb_to_rgbw, WhiteStrategy
-        r, g, b, w = rgb_to_rgbw(0.0, 0.0, 1.0, WhiteStrategy.DESATURATE)
-        assert w < 0.1
+        from light_engine.color import rgb_to_rgbcct
+        c = rgb_to_rgbcct(0.0, 0.0, 1.0)
+        assert c.warm_white < 0.1
+        assert c.cool_white < 0.1
 
 
 class TestVideoAmbientMapping:

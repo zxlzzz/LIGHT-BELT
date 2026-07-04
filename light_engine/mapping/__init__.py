@@ -22,7 +22,7 @@ class ZoneDef:
 
     id: str
     label: str = ""
-    zone_type: str = "digital"  # "digital" or "rgbw"
+    zone_type: str = "digital"  # "digital" or "rgbcct"
     pixel_count: int = 0
     direction: str = "forward"  # "forward" or "reverse"
     video_zone: str = "center"
@@ -69,7 +69,7 @@ class Layout:
                 s.get("id", "?"), vz, s.get("direction", "forward"),
             )
 
-        # Load RGBW zones
+        # Load RGB+CCT zones
         zones_data = config.get("layout.zones", [])
         for z in zones_data:
             vz = z.get("video_zone", "center")
@@ -81,13 +81,13 @@ class Layout:
             layout.zones.append(ZoneDef(
                 id=z.get("id", ""),
                 label=z.get("label", z.get("id", "")),
-                zone_type=z.get("type", "rgbw"),
+                zone_type=z.get("type", "rgbcct"),
                 pixel_count=1,
                 direction=z.get("direction", "forward"),
                 video_zone=vz,
             ))
             logger.debug(
-                "RGBW zone '%s': video_zone='%s', direction='%s'",
+                "RGB+CCT zone '%s': video_zone='%s', direction='%s'",
                 z.get("id", "?"), vz, z.get("direction", "forward"),
             )
 
@@ -97,7 +97,7 @@ class Layout:
         return layout
 
     def get_zone_ids(self) -> list[str]:
-        """Get all RGBW zone IDs."""
+        """Get all RGB+CCT zone IDs."""
         return [z.id for z in self.zones]
 
     def get_strip_ids(self) -> list[str]:
@@ -112,7 +112,7 @@ class Layout:
         return None
 
     def get_zone(self, zone_id: str) -> Optional[ZoneDef]:
-        """Get an RGBW zone by ID."""
+        """Get an RGB+CCT zone by ID."""
         for z in self.zones:
             if z.id == zone_id:
                 return z
@@ -127,5 +127,5 @@ class Layout:
         return sum(s.pixel_count for s in self.strips)
 
     def total_zones(self) -> int:
-        """Total number of RGBW zones."""
+        """Total number of RGB+CCT zones."""
         return len(self.zones)

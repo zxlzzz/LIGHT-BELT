@@ -10,7 +10,7 @@ from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
+    RGBCCTColor,
     ZoneOutput,
 )
 
@@ -29,7 +29,6 @@ class CometEffect(BaseEffect):
         self._tails: dict[str, list[tuple[float, float, float, float]]] = {}
 
     def process(self, ctx: EffectContext) -> PixelFrame:
-        bri = ctx.global_brightness
         strips = []
 
         for sd in ctx.mode_parameters.get("strip_defs", []):
@@ -55,7 +54,7 @@ class CometEffect(BaseEffect):
 
             # Add new head
             hue = self._hues[sid]
-            head_r, head_g, head_b = colorsys.hsv_to_rgb(hue / 360, 1.0, bri)
+            head_r, head_g, head_b = colorsys.hsv_to_rgb(hue / 360, 1.0, 1.0)
             self._tails[sid].append((pos, head_r, head_g, head_b))
 
             # Decay and remove old tails
@@ -96,7 +95,7 @@ class CometEffect(BaseEffect):
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zones.append(ZoneOutput(
                 zone_id=zd["id"],
-                color=RGBWColor(r=0.0, g=0.0, b=0.0, w=0.0, brightness=0.0),
+                color=RGBCCTColor(),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

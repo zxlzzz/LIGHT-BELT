@@ -4,12 +4,12 @@ import colorsys
 import math
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 
@@ -34,7 +34,7 @@ class CalmEffect(BaseEffect):
         hue = (self._base_hue + math.sin(t * 2 * math.pi) * 10) % 360
         val = 0.1 + math.sin(t * 0.8) * 0.05 + 0.15
         val = min(0.35, val)
-        bri = val * ctx.global_brightness
+        bri = val
         r, g, b = colorsys.hsv_to_rgb(hue / 360, 0.3, val)
 
         strips = []
@@ -49,7 +49,7 @@ class CalmEffect(BaseEffect):
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zones.append(ZoneOutput(
                 zone_id=zd["id"],
-                color=RGBWColor(r=r * bri, g=g * bri, b=b * bri, w=0.0, brightness=bri),
+                color=rgb_to_rgbcct(r * bri, g * bri, b * bri),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

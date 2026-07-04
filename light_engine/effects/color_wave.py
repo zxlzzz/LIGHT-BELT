@@ -4,12 +4,12 @@ import colorsys
 import math
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 
@@ -28,7 +28,6 @@ class ColorWaveEffect(BaseEffect):
     def process(self, ctx: EffectContext) -> PixelFrame:
         self._phase += ctx.delta_time * self._speed * ctx.speed
         hue_base = (self._phase * self._hue_rate * 360) % 360
-        bri = ctx.global_brightness
 
         strips = []
         for sd in ctx.mode_parameters.get("strip_defs", []):
@@ -37,7 +36,7 @@ class ColorWaveEffect(BaseEffect):
             for i in range(n):
                 pos = (i / max(1, n)) / self._width + self._phase
                 hue = (hue_base + pos * 120) % 360
-                r, g, b = colorsys.hsv_to_rgb(hue / 360, 1.0, bri)
+                r, g, b = colorsys.hsv_to_rgb(hue / 360, 1.0, 1.0)
                 pixels.append((r, g, b))
             strips.append(DigitalStrip(
                 strip_id=sd["id"], pixel_count=n, pixels=pixels
@@ -46,10 +45,10 @@ class ColorWaveEffect(BaseEffect):
         zones = []
         for zd in ctx.mode_parameters.get("zone_defs", []):
             hue = (hue_base + self._phase * 60) % 360
-            r, g, b = colorsys.hsv_to_rgb(hue / 360, 1.0, bri)
+            r, g, b = colorsys.hsv_to_rgb(hue / 360, 1.0, 1.0)
             zones.append(ZoneOutput(
                 zone_id=zd["id"],
-                color=RGBWColor(r=r, g=g, b=b, w=0.0, brightness=bri),
+                color=rgb_to_rgbcct(r, g, b),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

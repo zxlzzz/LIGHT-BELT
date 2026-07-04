@@ -16,7 +16,7 @@ from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
+    RGBCCTColor,
     ZoneOutput,
 )
 
@@ -75,7 +75,6 @@ class ChaseEffect(BaseEffect):
         if ctx.video_features:
             video_rgb = ctx.video_features.average_rgb
 
-        bri = ctx.global_brightness
         strips = []
 
         for sd in ctx.mode_parameters.get("strip_defs", []):
@@ -106,7 +105,7 @@ class ChaseEffect(BaseEffect):
                 if dist <= self._width:
                     intensity = 1.0 - (dist / self._width) * (1.0 - self._trail)
                     r, g, b = self._chase_color(i, n, video_rgb)
-                    pixels.append((r * intensity * bri, g * intensity * bri, b * intensity * bri))
+                    pixels.append((r * intensity, g * intensity, b * intensity))
                 else:
                     pixels.append((0.0, 0.0, 0.0))
 
@@ -118,7 +117,7 @@ class ChaseEffect(BaseEffect):
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zones.append(ZoneOutput(
                 zone_id=zd["id"],
-                color=RGBWColor(r=0.0, g=0.0, b=0.0, w=0.0, brightness=0.0),
+                color=RGBCCTColor(),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

@@ -124,7 +124,7 @@ class TerminalSimulator:
                     line += _rgb_to_ansi(r / 255, g / 255, b / 255) + " " + _RESET
             lines.append(line)
 
-        # Draw RGBW zones
+        # Draw RGB+CCT zones
         if frame.zones:
             lines.append(f" {'─' * 80}")
             for zone in frame.zones:
@@ -132,7 +132,8 @@ class TerminalSimulator:
                 block = _rgb_to_ansi(c["r"] / 255, c["g"] / 255, c["b"] / 255)
                 lines.append(
                     f" {zone.zone_id:<16} │{block}  {_RESET}"
-                    f" R:{c['r']:3d} G:{c['g']:3d} B:{c['b']:3d} W:{c['w']:3d}"
+                    f" R:{c['r']:3d} G:{c['g']:3d} B:{c['b']:3d}"
+                    f" WW:{c['warm_white']:3d} CW:{c['cool_white']:3d}"
                 )
 
         # Debug info

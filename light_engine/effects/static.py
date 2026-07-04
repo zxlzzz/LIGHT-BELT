@@ -1,12 +1,12 @@
 """STATIC effect - constant color across all strips and zones."""
 
 from light_engine.config import Config
+from light_engine.color import rgb_to_rgbcct
 from light_engine.effects.base import BaseEffect
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
     PixelFrame,
-    RGBWColor,
     ZoneOutput,
 )
 
@@ -24,12 +24,11 @@ class StaticEffect(BaseEffect):
 
     def process(self, ctx: EffectContext) -> PixelFrame:
         r, g, b = self._color
-        bri = ctx.global_brightness
 
         strips = []
         for strip_def in ctx.mode_parameters.get("strip_defs", []):
             pixel_count = strip_def.get("pixel_count", 0)
-            pixels = [(r * bri, g * bri, b * bri)] * pixel_count
+            pixels = [(r, g, b)] * pixel_count
             strips.append(DigitalStrip(
                 strip_id=strip_def["id"], pixel_count=pixel_count, pixels=pixels
             ))
@@ -38,7 +37,7 @@ class StaticEffect(BaseEffect):
         for zone_def in ctx.mode_parameters.get("zone_defs", []):
             zones.append(ZoneOutput(
                 zone_id=zone_def["id"],
-                color=RGBWColor(r=r * bri, g=g * bri, b=b * bri, w=0.0, brightness=bri),
+                color=rgb_to_rgbcct(r, g, b),
             ))
 
         return PixelFrame(timestamp=ctx.timestamp, strips=strips, zones=zones)

@@ -32,7 +32,7 @@ outputs:
     max_packet_size: 1400
     fragment_timeout: 0.1     # Fragment reassembly timeout
 
-  # Serial output (for STM32 RGBW zones)
+  # Serial output (legacy v1 transport for STM32 analog zones)
   serial:
     enabled: false
     port: "COM3"
