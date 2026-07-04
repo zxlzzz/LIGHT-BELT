@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import argparse
 import re
@@ -159,8 +159,12 @@ def require_available_plan(
     plan: WorktreePlan,
 ) -> None:
     branch_result = run_git(
-        ["show-ref", "--verify", "--quiet",
-         f"refs/heads/{plan.branch_name}"],
+        [
+            "show-ref",
+            "--verify",
+            "--quiet",
+            f"refs/heads/{plan.branch_name}",
+        ],
         cwd=repo_root,
     )
 
@@ -193,14 +197,47 @@ def print_plan(
     print(f"worktree={plan.worktree_path}")
 
 
+def create_worktree(
+    repo_root: Path,
+    plan: WorktreePlan,
+) -> None:
+    plan.worktree_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    result = run_git(
+        [
+            "worktree",
+            "add",
+            "-b",
+            plan.branch_name,
+            str(plan.worktree_path),
+            plan.base_commit,
+        ],
+        cwd=repo_root,
+    )
+
+    if result.returncode != 0:
+        raise WorktreeError(
+            "Failed to create agent worktree.\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+
+    print("AGENT_WORKTREE_CREATED")
+    print(f"branch={plan.branch_name}")
+    print(f"worktree={plan.worktree_path}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Plan a safe isolated LIGHT-BELT agent worktree."
+        description="Prepare a safe isolated LIGHT-BELT agent worktree."
     )
     parser.add_argument(
         "--phase-id",
         required=True,
-        help="Lowercase Phase identifier, for example phase-04-rs485-v2.",
+        help="Lowercase Phase identifier.",
     )
     parser.add_argument(
         "--task",
@@ -213,11 +250,19 @@ def parse_args() -> argparse.Namespace:
         default="main",
         help="Clean base branch. Default: main.",
     )
-    parser.add_argument(
+
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
         "--plan-only",
         action="store_true",
-        help="Validate and print the worktree plan without creating it.",
+        help="Validate and print the plan without creating a worktree.",
     )
+    mode.add_argument(
+        "--create",
+        action="store_true",
+        help="Create the isolated branch and Git worktree.",
+    )
+
     return parser.parse_args()
 
 
@@ -237,20 +282,17 @@ def main() -> int:
             phase_id=phase_id,
             base_branch=args.base_branch,
         )
+
         require_available_plan(repo_root, plan)
         print_plan(plan, task_path)
 
-        if not args.plan_only:
-            print(
-                "Creation is intentionally disabled in this version. "
-                "Use --plan-only."
-            )
-            return 2
+        if args.create:
+            create_worktree(repo_root, plan)
 
         return 0
 
     except WorktreeError as exc:
-        print("AGENT_WORKTREE_PLAN_FAILED", file=sys.stderr)
+        print("AGENT_WORKTREE_FAILED", file=sys.stderr)
         print(str(exc), file=sys.stderr)
         return 1
 
