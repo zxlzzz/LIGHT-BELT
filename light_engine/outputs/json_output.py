@@ -46,7 +46,7 @@ class JsonOutput(LightOutput):
         data = {
             "timestamp": frame.timestamp,
             "sequence": frame.sequence,
-            "digital_frames": [
+            "digital_nodes": [
                 {
                     "node_id": digital.node_id,
                     "host": digital.host,
@@ -59,7 +59,7 @@ class JsonOutput(LightOutput):
                 }
                 for digital in frame.digital_frames
             ],
-            "analog_commands": [
+            "analog_nodes": [
                 {
                     "node_id": command.node_id,
                     "zone_id": command.zone_id,
@@ -74,6 +74,8 @@ class JsonOutput(LightOutput):
             ],
             "metadata": frame.metadata,
         }
+        data["digital_frames"] = data["digital_nodes"]
+        data["analog_commands"] = data["analog_nodes"]
         return data
 
     def _logical_frame_data(self, frame: PixelFrame) -> dict:

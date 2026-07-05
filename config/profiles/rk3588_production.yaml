@@ -1,0 +1,10 @@
+# RK3588 production profile.
+# Enables production mode only; this file does not claim real-device verification.
+
+outputs:
+  mode: "production"
+
+system:
+  platform: "linux_arm64"
+  clock:
+    mode: "mpv"

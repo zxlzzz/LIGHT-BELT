@@ -6,6 +6,7 @@ outputs:
   # - fake: benchmark-only success path, NOT HARDWARE VERIFIED
   # - production: real transports; open/send failures are explicit
   mode: "memory"
+  exit_safe_state: true
 
   # Enabled output backends
   enabled:

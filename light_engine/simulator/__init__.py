@@ -12,7 +12,7 @@ import time
 from typing import Optional
 
 from light_engine.config import Config
-from light_engine.models import PixelFrame
+from light_engine.mapping.physical import PhysicalFrame
 from light_engine.outputs import SimulatorOutput
 
 
@@ -104,7 +104,7 @@ class TerminalSimulator:
             self._running = False
             print(_RESET)
 
-    def _draw(self, frame: PixelFrame) -> None:
+    def _draw(self, frame: PhysicalFrame) -> None:
         """Render one frame to the terminal."""
         elapsed = time.perf_counter() - self._start_time
         fps = self._frame_count / max(0.001, elapsed)
@@ -113,25 +113,27 @@ class TerminalSimulator:
         lines.append(_CLEAR)
         lines.append(f"{_BOLD}╔══ Light Engine Simulator ══╗{_RESET}")
 
-        # Draw each digital strip
-        for strip in frame.strips:
-            line = f" {strip.strip_id:<16} │"
-            pixels_uint8 = strip.to_uint8()
-            pixels_per_char = max(1, strip.pixel_count // self._width)
-            for i in range(0, strip.pixel_count, pixels_per_char):
-                if i < len(pixels_uint8):
-                    r, g, b = pixels_uint8[i]
-                    line += _rgb_to_ansi(r / 255, g / 255, b / 255) + " " + _RESET
+        # Draw each physical digital node.
+        for node in frame.digital_frames:
+            label = f"node {node.node_id}"
+            line = f" {label:<16} │"
+            pixel_count = len(node.pixels)
+            pixels_per_char = max(1, pixel_count // self._width)
+            for i in range(0, pixel_count, pixels_per_char):
+                if i < pixel_count:
+                    r, g, b = node.pixels[i]
+                    line += _rgb_to_ansi(r, g, b) + " " + _RESET
             lines.append(line)
 
-        # Draw RGB+CCT zones
-        if frame.zones:
+        # Draw physical RGB+CCT node commands.
+        if frame.analog_commands:
             lines.append(f" {'─' * 80}")
-            for zone in frame.zones:
-                c = zone.color.to_uint8()
+            for command in frame.analog_commands:
+                c = command.color.to_uint8()
                 block = _rgb_to_ansi(c["r"] / 255, c["g"] / 255, c["b"] / 255)
                 lines.append(
-                    f" {zone.zone_id:<16} │{block}  {_RESET}"
+                    f" node {command.node_id:<11} │{block}  {_RESET}"
+                    f" zone:{command.zone_id:<16}"
                     f" R:{c['r']:3d} G:{c['g']:3d} B:{c['b']:3d}"
                     f" WW:{c['warm_white']:3d} CW:{c['cool_white']:3d}"
                 )

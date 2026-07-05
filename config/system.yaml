@@ -3,6 +3,10 @@
 
 system:
   version: "0.1.0"
+  platform: "windows"
+
+  clock:
+    mode: "internal"
 
   # Frame rates
   output_fps: 30.0           # Light output frame rate

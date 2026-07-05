@@ -1,0 +1,10 @@
+# Windows development profile.
+# Uses explicit non-hardware transports. NOT HARDWARE VERIFIED.
+
+outputs:
+  mode: "memory"
+
+system:
+  platform: "windows"
+  clock:
+    mode: "internal"

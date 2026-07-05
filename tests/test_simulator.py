@@ -4,14 +4,40 @@ import threading
 import time
 
 import pytest
-from light_engine.models import PixelFrame, DigitalStrip
+from light_engine.mapping.physical import (
+    AnalogNodeCommand,
+    DigitalNodeFrame,
+    PhysicalFrame,
+)
+from light_engine.models import RGBCCTColor
 from light_engine.outputs.simulator_output import SimulatorOutput
 
 
 def _make_frame(timestamp=0.0):
-    strip = DigitalStrip(strip_id="s1", pixel_count=3,
-                         pixels=[(0.1, 0.2, 0.3), (0.4, 0.5, 0.6), (0.7, 0.8, 0.9)])
-    return PixelFrame(timestamp=timestamp, strips=[strip])
+    return PhysicalFrame(
+        timestamp=timestamp,
+        sequence=round(timestamp * 1000),
+        digital_frames=[
+            DigitalNodeFrame(
+                node_id=7,
+                host="127.0.0.1",
+                port=9001,
+                pixels=[
+                    (0.1, 0.2, 0.3),
+                    (0.4, 0.5, 0.6),
+                    (0.7, 0.8, 0.9),
+                ],
+            )
+        ],
+        analog_commands=[
+            AnalogNodeCommand(
+                node_id=1,
+                zone_id="ceiling_left",
+                color=RGBCCTColor(r=0.1, g=0.2, b=0.3),
+            )
+        ],
+        metadata={"logical_regions": {"ceiling_left": "top"}},
+    )
 
 
 class TestSimulatorOutput:
@@ -213,4 +239,18 @@ class TestSimulatorAutoExit:
         out = SimulatorOutput()
         out.open()
         assert out.pop_latest() is None
+        out.close()
+
+    def test_draw_displays_physical_node_grouping(self, capsys):
+        from light_engine.simulator import TerminalSimulator
+
+        out = SimulatorOutput()
+        out.open()
+        sim = TerminalSimulator(out)
+        sim._draw(_make_frame(1.0))
+
+        captured = capsys.readouterr().out
+        assert "node 7" in captured
+        assert "node 1" in captured
+        assert "zone:ceiling_left" in captured
         out.close()
