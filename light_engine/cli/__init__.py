@@ -4,10 +4,13 @@ import argparse
 import json
 import logging
 import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from light_engine import __version__
+from light_engine.clock import FakeClock, MpvIPCClock, OfflineRenderClock
 from light_engine.config import Config
 from light_engine.engine import Engine
 from light_engine.outputs import health_summary
@@ -27,12 +30,31 @@ def _print_health_summary(outputs: dict) -> None:
     print(json.dumps(health_summary(outputs), indent=2, sort_keys=True))
 
 
+def _default_mpv_socket() -> str:
+    return str(Path(tempfile.gettempdir()) / "light-belt-mpv-ipc")
+
+
+def _clock_from_args(args: argparse.Namespace, config: Config):
+    mode = getattr(args, "clock", None) or config.get("system.clock.mode", "internal")
+    if mode == "internal":
+        return OfflineRenderClock(fps=config.get("system.output_fps", 30.0))
+    if mode == "offline":
+        return OfflineRenderClock(fps=config.get("system.output_fps", 30.0))
+    if mode == "fake":
+        return FakeClock()
+    if mode == "mpv":
+        clock = MpvIPCClock(getattr(args, "mpv_socket", None) or _default_mpv_socket())
+        clock.connect()
+        return clock
+    raise ValueError(f"Unknown clock mode: {mode}")
+
+
 def cmd_demo(args: argparse.Namespace) -> int:
     """Run demo with synthetic data."""
     config = Config.get_instance(Path(args.config) if args.config else None)
     setup_logging(config.get("system.logging.level", "INFO"))
 
-    engine = Engine(config)
+    engine = Engine(config, clock=_clock_from_args(args, config))
     engine.use_synthetic(seed=args.seed)
     engine.set_effect(args.effect or "demo")
     engine.init_outputs()
@@ -61,7 +83,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     config = Config.get_instance(Path(args.config) if args.config else None)
     setup_logging(config.get("system.logging.level", "INFO"))
 
-    engine = Engine(config)
+    engine = Engine(config, clock=_clock_from_args(args, config))
     if args.video:
         try:
             engine.load_video(args.video)
@@ -107,7 +129,7 @@ def cmd_simulator(args: argparse.Namespace) -> int:
     sim_out = SimulatorOutput()
     sim_out.open()
 
-    engine = Engine(config)
+    engine = Engine(config, clock=_clock_from_args(args, config))
     if args.video:
         try:
             engine.load_video(args.video)
@@ -165,7 +187,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     # Force JSON output
     config._data["outputs"] = {"enabled": ["json"], "json": {"path": args.output, "pretty": False}}
 
-    engine = Engine(config)
+    engine = Engine(config, clock=_clock_from_args(args, config))
     if args.video:
         try:
             engine.load_video(args.video)
@@ -199,7 +221,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     config = Config.get_instance(Path(args.config) if args.config else None)
     setup_logging("WARNING")
 
-    engine = Engine(config)
+    engine = Engine(config, clock=_clock_from_args(args, config))
     engine.use_synthetic(seed=args.seed)
     engine.set_effect(args.effect or "video_audio_fusion")
 
@@ -233,6 +255,60 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run_mpv(args: argparse.Namespace) -> int:
+    """Launch or connect to mpv JSON IPC and run the lighting engine."""
+    config = Config.get_instance(Path(args.config) if args.config else None)
+    setup_logging(config.get("system.logging.level", "INFO"))
+
+    socket_path = args.mpv_socket or _default_mpv_socket()
+    mpv_process = None
+    if args.media:
+        mpv_cmd = [
+            args.mpv_binary,
+            f"--input-ipc-server={socket_path}",
+            "--idle=yes",
+            args.media,
+        ]
+        try:
+            mpv_process = subprocess.Popen(mpv_cmd)
+        except OSError as e:
+            print(f"Error: failed to start mpv: {e}", file=sys.stderr)
+            return 1
+
+    try:
+        clock = MpvIPCClock(socket_path)
+        clock.connect()
+    except Exception as e:
+        if mpv_process is not None:
+            mpv_process.terminate()
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    engine = Engine(config, clock=clock)
+    engine.set_effect(args.effect or "video_audio_fusion")
+    engine.init_outputs()
+
+    print(f"Light Engine v{__version__} - mpv Clock Mode")
+    print(f"  IPC: {socket_path}")
+    print(f"  Effect: {args.effect or 'video_audio_fusion'}")
+    print("  Clock: mpv")
+
+    try:
+        engine.run(duration=args.duration, max_frames=args.max_frames)
+    finally:
+        clock.close()
+        if mpv_process is not None:
+            mpv_process.terminate()
+            mpv_process.wait(timeout=3.0)
+
+    stats = engine.get_fps_stats()
+    print(f"\nCompleted: {stats['frame_count']} frames")
+    print(f"  Effective FPS: {stats['effective_fps']:.1f}")
+    print(f"  Processing capacity: {stats['processing_capacity']:.1f} FPS")
+    _print_health_summary(engine._outputs)
+    return 0
+
+
 def main() -> None:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -250,6 +326,7 @@ def main() -> None:
     p_demo.add_argument("--duration", "-d", type=float, default=30.0, help="Duration in seconds")
     p_demo.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
     p_demo.add_argument("--seed", type=int, default=42, help="Random seed")
+    p_demo.add_argument("--clock", choices=["internal", "offline", "fake"], default="internal")
 
     # run
     p_run = subparsers.add_parser("run", help="Run with media files")
@@ -258,6 +335,8 @@ def main() -> None:
     p_run.add_argument("--effect", "-e", default=None, help="Effect name")
     p_run.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
     p_run.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
+    p_run.add_argument("--clock", choices=["internal", "offline", "fake", "mpv"], default="internal")
+    p_run.add_argument("--mpv-socket", default=None, help="mpv JSON IPC socket path")
 
     # simulator
     p_sim = subparsers.add_parser("simulator", help="Run terminal simulator")
@@ -267,6 +346,7 @@ def main() -> None:
     p_sim.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
     p_sim.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
     p_sim.add_argument("--seed", type=int, default=42, help="Random seed")
+    p_sim.add_argument("--clock", choices=["internal", "offline", "fake"], default="internal")
 
     # export
     p_export = subparsers.add_parser("export", help="Export lighting data to JSONL")
@@ -276,12 +356,24 @@ def main() -> None:
     p_export.add_argument("--output", "-o", default="output.jsonl", help="Output file path")
     p_export.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
     p_export.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
+    p_export.add_argument("--clock", choices=["internal", "offline", "fake", "mpv"], default="offline")
+    p_export.add_argument("--mpv-socket", default=None, help="mpv JSON IPC socket path")
 
     # benchmark
     p_bench = subparsers.add_parser("benchmark", help="Run performance benchmark")
     p_bench.add_argument("--effect", "-e", default="video_audio_fusion", help="Effect name")
     p_bench.add_argument("--frames", "-n", type=int, default=600, help="Number of frames")
     p_bench.add_argument("--seed", type=int, default=42, help="Random seed")
+    p_bench.add_argument("--clock", choices=["internal", "offline", "fake"], default="offline")
+
+    # run-mpv
+    p_run_mpv = subparsers.add_parser("run-mpv", help="Run using mpv JSON IPC clock")
+    p_run_mpv.add_argument("--media", "-m", default=None, help="Optional media path to launch with mpv")
+    p_run_mpv.add_argument("--mpv-binary", default="mpv", help="mpv executable")
+    p_run_mpv.add_argument("--mpv-socket", default=None, help="mpv JSON IPC socket path")
+    p_run_mpv.add_argument("--effect", "-e", default=None, help="Effect name")
+    p_run_mpv.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
+    p_run_mpv.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
 
     args = parser.parse_args()
 
@@ -295,6 +387,8 @@ def main() -> None:
         sys.exit(cmd_export(args))
     elif args.command == "benchmark":
         sys.exit(cmd_benchmark(args))
+    elif args.command == "run-mpv":
+        sys.exit(cmd_run_mpv(args))
     elif args.command == "inspect-video":
         sys.exit(cmd_inspect_video(args))
     elif args.command == "inspect-audio":

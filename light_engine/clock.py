@@ -14,6 +14,20 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from light_engine.media.mpv_adapter import MpvIPCAdapter, MpvIPCError
+
+
+class ClockError(RuntimeError):
+    """Base class for explicit clock failures."""
+
+
+class MediaEnded(ClockError):
+    """Raised when a media-owned clock reaches end of media."""
+
+
+class ClockConnectionError(ClockError):
+    """Raised when a clock cannot connect to its external time source."""
+
 
 class Clock(ABC):
     """Abstract clock interface.
@@ -34,6 +48,14 @@ class Clock(ABC):
     def reset(self) -> None:
         """Reset clock to initial state."""
         pass
+
+    @property
+    def paused(self) -> bool:
+        return False
+
+    @property
+    def ended(self) -> bool:
+        return False
 
 
 class MonotonicClock(Clock):
@@ -92,6 +114,8 @@ class FakeClock(Clock):
 
     def __init__(self, start_time: float = 0.0):
         self._time = start_time
+        self._paused = False
+        self._ended = False
 
     def now(self) -> float:
         return self._time
@@ -108,8 +132,78 @@ class FakeClock(Clock):
         """Set absolute time."""
         self._time = t
 
+    def set_paused(self, paused: bool) -> None:
+        self._paused = paused
+
+    def set_ended(self, ended: bool) -> None:
+        self._ended = ended
+
     def reset(self) -> None:
         self._time = 0.0
+        self._paused = False
+        self._ended = False
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    @property
+    def ended(self) -> bool:
+        return self._ended
+
+
+class MpvIPCClock(Clock):
+    """Clock driven by mpv's JSON IPC playback-time property."""
+
+    def __init__(self, ipc_path: str, adapter: Optional[MpvIPCAdapter] = None):
+        self._adapter = adapter or MpvIPCAdapter(ipc_path)
+        self._position = 0.0
+        self._last_position = 0.0
+        self._paused = False
+        self._ended = False
+
+    def connect(self) -> None:
+        try:
+            self._adapter.connect()
+        except MpvIPCError as exc:
+            raise ClockConnectionError(str(exc)) from exc
+
+    def now(self) -> float:
+        return self._position
+
+    def tick(self) -> float:
+        try:
+            state = self._adapter.read_state()
+        except MpvIPCError as exc:
+            raise ClockError(str(exc)) from exc
+
+        if state.ended:
+            self._ended = True
+            raise MediaEnded("mpv reported end of media")
+
+        self._paused = state.paused
+        self._last_position = self._position
+        self._position = state.position
+        if self._paused:
+            return 0.0
+        return max(0.0, self._position - self._last_position)
+
+    def reset(self) -> None:
+        self._position = 0.0
+        self._last_position = 0.0
+        self._paused = False
+        self._ended = False
+
+    def close(self) -> None:
+        self._adapter.close()
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    @property
+    def ended(self) -> bool:
+        return self._ended
 
 
 class VideoPtsClock(Clock):

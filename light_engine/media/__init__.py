@@ -10,7 +10,17 @@ import cv2
 import numpy as np
 import soundfile as sf
 
+from light_engine.media.mpv_adapter import MpvIPCAdapter, MpvIPCError, MpvState
+
 logger = logging.getLogger(__name__)
+
+__all__ = [
+    "AudioReader",
+    "MpvIPCAdapter",
+    "MpvIPCError",
+    "MpvState",
+    "VideoReader",
+]
 
 
 class VideoReader:

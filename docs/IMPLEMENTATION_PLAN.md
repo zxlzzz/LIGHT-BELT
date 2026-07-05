@@ -693,6 +693,18 @@ light_engine benchmark    → NullOutput, 正常
 
 **风险**: 中（改变时间推进）
 
+**实现状态（Iteration 1）**:
+
+- Engine accepts an injected `Clock`.
+- Internal/offline clocks use deterministic fixed-step ownership.
+- `MpvIPCClock` reads mpv JSON IPC `playback-time`, `pause`, `idle-active`, and
+  `eof-reached`.
+- Seek jumps reset analyzer/effect state while preserving Engine sequence
+  ownership.
+- Paused clocks skip analysis updates and keep deterministic output.
+- `run-mpv` and CLI `--clock` selection are available.
+- RK3588 deployment notes are documented as `NOT HARDWARE VERIFIED`.
+
 **完成条件**: FakeClock 端到端通过，benchmark 与 Phase 0 一致
 
 **提交边界**: `Phase 7: Media clock integration with mpv IPC support`

@@ -9,6 +9,7 @@ from typing import Optional
 import numpy as np
 
 from light_engine.analysis import AudioAnalyzer, VideoAnalyzer
+from light_engine.clock import Clock, ClockError, MediaEnded, OfflineRenderClock
 from light_engine.config import Config
 from light_engine.effects.base import BaseEffect, create_effect, list_effects
 from light_engine.mapping import Layout, ZoneDef, PhysicalMapping
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 class Engine:
     """Main lighting engine orchestrating analysis, effects, and output."""
 
-    def __init__(self, config: Optional[Config] = None):
+    def __init__(self, config: Optional[Config] = None, clock: Optional[Clock] = None):
         if config is None:
             config = Config.get_instance()
         self._config = config
@@ -70,10 +71,12 @@ class Engine:
         self._output_transform = OutputTransform(
             global_brightness=config.get("system.smoothing.max_brightness", 0.85)
         )
+        self._clock: Clock = clock or OfflineRenderClock(fps=self._output_fps)
 
         # State
         self._running = False
         self._timestamp: float = 0.0
+        self._last_clock_time: float = self._clock.now()
         self._frame_count: int = 0
         self._sequence: int = 0
         self._fps_stats: list[float] = []
@@ -179,6 +182,21 @@ class Engine:
         try:
             while self._running:
                 frame_start = time.perf_counter()
+                dt = self._clock.tick()
+                self._timestamp = self._clock.now()
+                clock_delta = self._timestamp - self._last_clock_time
+                if dt <= 0.0:
+                    dt = max(0.0, clock_delta)
+                seek_detected = clock_delta < -frame_period or dt > frame_period * 2
+                paused = self._clock.paused or dt < frame_period * 0.1
+                if self._clock.ended:
+                    break
+
+                if seek_detected:
+                    self._handle_timeline_reset()
+                    last_video_time = -video_period
+                    last_audio_time = -audio_period
+                self._last_clock_time = self._timestamp
 
                 # Check stop conditions
                 if duration is not None and self._timestamp >= duration:
@@ -215,20 +233,21 @@ class Engine:
                     break
 
                 # Video analysis
-                if self._timestamp - last_video_time >= video_period:
+                if not paused and self._timestamp - last_video_time >= video_period:
                     self._latest_video = self._get_video_features()
                     last_video_time = self._timestamp
 
                 # Audio analysis
-                if self._timestamp - last_audio_time >= audio_period:
+                if not paused and self._timestamp - last_audio_time >= audio_period:
                     self._latest_audio = self._get_audio_features()
                     last_audio_time = self._timestamp
 
                 # Build context and run effect
                 self._sequence += 1
+                context_dt = dt if dt > 0.0 else 1e-9
                 ctx = EffectContext(
                     timestamp=self._timestamp,
-                    delta_time=frame_period,
+                    delta_time=context_dt,
                     sequence=self._sequence,
                     video_features=self._latest_video,
                     audio_features=self._latest_audio,
@@ -255,15 +274,32 @@ class Engine:
                 sleep_time = frame_period - elapsed
                 if sleep_time > 0:
                     time.sleep(sleep_time)
-                self._timestamp += frame_period
 
         except KeyboardInterrupt:
             logger.info("Engine interrupted by user")
+        except MediaEnded:
+            logger.info("Media clock reached end of media")
+        except ClockError as e:
+            logger.exception("Engine clock error")
+            self._diagnostics["last_error"] = str(e)
+            raise
         except Exception as e:
             logger.exception("Engine error")
             self._diagnostics["last_error"] = str(e)
+            raise
         finally:
             self._shutdown()
+
+    def _handle_timeline_reset(self) -> None:
+        """Reset stateful analysis/effect components after a media seek."""
+        if self._video_analyzer is not None and hasattr(self._video_analyzer, "reset"):
+            self._video_analyzer.reset()
+        if self._audio_analyzer is not None and hasattr(self._audio_analyzer, "reset"):
+            self._audio_analyzer.reset()
+        if self._effect is not None:
+            self._effect.reset()
+        self._latest_video = None
+        self._latest_audio = None
 
     def _get_video_features(self) -> Optional[VideoFeatures]:
         """Get latest video features from reader or synthetic source."""

@@ -34,18 +34,23 @@
 
 ## Thread Model
 
-Current implementation is single-threaded with frame-rate control via `time.sleep()`.
-Analysis runs inline at configurable rates (video: 10Hz, audio: 60Hz, output: 30Hz).
+Current implementation is single-threaded. Engine time is owned by an injectable
+clock: deterministic internal/offline clocks for tests and exports, and an mpv
+JSON IPC clock for playback-synchronized runs. Analysis runs inline at
+configurable rates (video: 10Hz, audio: 60Hz, output: 30Hz).
 
 Future: Offload analysis to background threads for RK3588.
 
 ## Timeline Design
 
 - All timestamps in seconds (float)
-- Engine maintains unified timeline starting at t=0
+- Engine receives the unified timeline from its configured clock
 - Frame period = 1/output_fps
 - Analysis rates independently configurable
 - Synthetic data has configurable duration (default 120s)
+- Seek jumps reset stateful analyzers and effects while preserving engine-owned
+  sequence numbers
+- Paused media keeps output deterministic and skips analysis updates
 
 ## Performance Strategy
 

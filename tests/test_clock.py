@@ -3,9 +3,12 @@
 import time
 import pytest
 from light_engine.clock import (
+    ClockConnectionError,
     MonotonicClock,
+    MpvIPCClock,
     OfflineRenderClock,
     FakeClock,
+    MediaEnded,
     VideoPtsClock,
     AudioPlaybackClock,
     MasterClock,
@@ -110,3 +113,58 @@ class TestMasterClock:
         vc.update_pts(5.0)
         diag = mc.diagnostics()
         assert diag["video_pts"] == 5.0
+
+
+class FakeMpvAdapter:
+    def __init__(self, states=None, fail_connect=False):
+        self.states = list(states or [])
+        self.fail_connect = fail_connect
+        self.connected = False
+        self.closed = False
+
+    def connect(self):
+        if self.fail_connect:
+            from light_engine.media.mpv_adapter import MpvIPCError
+            raise MpvIPCError("boom")
+        self.connected = True
+
+    def read_state(self):
+        return self.states.pop(0)
+
+    def close(self):
+        self.closed = True
+
+
+class TestMpvIPCClock:
+    def test_connection_failure_is_explicit(self):
+        clock = MpvIPCClock("missing", adapter=FakeMpvAdapter(fail_connect=True))
+        with pytest.raises(ClockConnectionError):
+            clock.connect()
+
+    def test_tick_uses_mpv_position_and_pause_state(self):
+        from light_engine.media.mpv_adapter import MpvState
+
+        clock = MpvIPCClock(
+            "fake",
+            adapter=FakeMpvAdapter(
+                [
+                    MpvState(position=1.0, paused=False, ended=False),
+                    MpvState(position=1.5, paused=True, ended=False),
+                ]
+            ),
+        )
+        assert clock.tick() == 1.0
+        assert clock.now() == 1.0
+        assert clock.tick() == 0.0
+        assert clock.now() == 1.5
+        assert clock.paused is True
+
+    def test_end_of_media_raises(self):
+        from light_engine.media.mpv_adapter import MpvState
+
+        clock = MpvIPCClock(
+            "fake",
+            adapter=FakeMpvAdapter([MpvState(position=2.0, paused=False, ended=True)]),
+        )
+        with pytest.raises(MediaEnded):
+            clock.tick()
