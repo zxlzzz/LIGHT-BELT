@@ -67,3 +67,5 @@ secrets/
 .python-temp/
 .python-runtime-*/
 .python-runtime-*.zip
+
+.tmp-pip/
