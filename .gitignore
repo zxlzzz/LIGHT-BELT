@@ -60,3 +60,7 @@ secrets/
 
 
 .agent-worktrees/
+.pip-cache/
+.python-temp/
+.python-runtime-*/
+.python-runtime-*.zip
