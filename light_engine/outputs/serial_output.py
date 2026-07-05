@@ -328,7 +328,8 @@ class SerialOutput(LightOutput):
                 self._health.frames_dropped += 1
                 return
             self._write_queue.extend(packets)
-            self._health.frames_sent += 1
+            self._health.logical_frames_sent += 1
+            self._health.mark_success()
 
     def _writer_loop(self) -> None:
         """Background thread for writing queued frames."""
@@ -339,26 +340,33 @@ class SerialOutput(LightOutput):
                         if not self._write_queue:
                             break
                         data = self._write_queue.popleft()
-                    self._write_data(data)
-                    self._health.packets_sent += 1
+                    if self._write_data(data):
+                        self._health.packets_sent += 1
+                        self._health.mark_success()
+                    else:
+                        self._health.packets_dropped += 1
             except Exception as e:
                 self._health.last_error = str(e)
                 self._health.frames_dropped += 1
             time.sleep(0.001)  # 1ms polling, not busy-wait
 
-    def _write_data(self, data: bytes) -> None:
+    def _write_data(self, data: bytes) -> bool:
         """Write raw bytes to the transport."""
         if self._use_memory and self._memory_transport is not None:
             self._memory_transport.extend(data)
             # Feed to parser for loopback testing
             if self._parser is not None:
                 self._parser.feed(data)
+            return True
         elif self._enabled and self._serial is not None:
             try:
                 self._serial.write(data)  # type: ignore
+                return True
             except Exception:
                 self._health.last_error = "Serial write failed"
                 self._attempt_reconnect()
+                return False
+        return False
 
     def _attempt_reconnect(self) -> None:
         """Attempt reconnection with backoff and max attempts."""

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import math
+import json
 from collections import deque
 
 import pytest
 
 import light_engine.outputs.serial_output as serial_module
 from light_engine.models import DigitalStrip, PixelFrame, RGBCCTColor, ZoneOutput
-from light_engine.outputs import send_all
+from light_engine.outputs import health_summary, send_all
 from light_engine.outputs.serial_output import SerialOutput, SerialStreamParser
 from light_engine.outputs.udp_output import MAX_PIXELS_PER_PACKET, UdpOutput
 
@@ -77,7 +78,7 @@ def test_udp_unopened_health_drop_does_not_call_health_as_function() -> None:
 
     health = output.health()
     assert health.frames_dropped == 1
-    assert health.frames_sent == 0
+    assert health.logical_frames_sent == 0
     assert health.packets_sent == 0
 
 
@@ -87,7 +88,7 @@ def test_udp_health_counts_one_logical_frame_and_multiple_packets() -> None:
     output.send_frame(_strip_frame(MAX_PIXELS_PER_PACKET + 1))
 
     health = output.health()
-    assert health.frames_sent == 1
+    assert health.logical_frames_sent == 1
     assert health.packets_sent == 2
     assert health.frames_dropped == 0
     assert len(sock.sent) == 2
@@ -99,7 +100,8 @@ def test_send_all_does_not_double_count_udp_backend_health() -> None:
     send_all({"udp": output}, _strip_frame())
 
     health = output.health()
-    assert health.frames_sent == 1
+    assert health.logical_frames_submitted == 1
+    assert health.logical_frames_sent == 1
     assert health.packets_sent == 1
     assert health.frames_dropped == 0
     assert len(sock.sent) == 1
@@ -112,7 +114,7 @@ def test_serial_send_frame_queue_drop_does_not_call_health_as_function() -> None
     output.send_frame(_zone_frame(zone_count=2))
 
     health = output.health()
-    assert health.frames_sent == 0
+    assert health.logical_frames_sent == 0
     assert health.frames_dropped == 1
     assert health.packets_sent == 0
     assert len(output._write_queue) == 0
@@ -125,7 +127,7 @@ def test_serial_counts_complete_logical_frame_when_queue_can_hold_all_packets() 
     output.send_frame(_zone_frame(zone_count=2))
 
     health = output.health()
-    assert health.frames_sent == 1
+    assert health.logical_frames_sent == 1
     assert health.frames_dropped == 0
     assert health.packets_sent == 0
     assert len(output._write_queue) == 2
@@ -144,7 +146,7 @@ def test_serial_writer_updates_packet_health_without_type_error(monkeypatch: pyt
     output._writer_loop()
 
     health = output.health()
-    assert health.frames_sent == 1
+    assert health.logical_frames_sent == 1
     assert health.packets_sent == 2
     assert health.frames_dropped == 0
     assert output.get_memory_bytes()
@@ -170,10 +172,50 @@ def test_serial_encode_failure_does_not_count_complete_logical_frame() -> None:
     output.send_frame(frame)
 
     health = output.health()
-    assert health.frames_sent == 0
+    assert health.logical_frames_sent == 0
     assert health.frames_dropped == 1
     assert health.packets_sent == 0
     assert len(output._write_queue) == 0
+
+
+def test_send_all_submitted_count_is_distinct_from_backend_counts() -> None:
+    output, sock = _enabled_udp_output()
+
+    send_all({"udp": output}, _strip_frame(MAX_PIXELS_PER_PACKET + 1))
+
+    health = output.health()
+    assert health.logical_frames_submitted == 1
+    assert health.logical_frames_sent == 1
+    assert health.packets_sent == 2
+    assert health.frames_sent == 1
+    assert len(sock.sent) == 2
+
+
+def test_send_all_counts_submitted_for_unhealthy_output_only() -> None:
+    output, _sock = _enabled_udp_output()
+    output.health().healthy = False
+
+    send_all({"udp": output}, _strip_frame())
+
+    health = output.health()
+    assert health.logical_frames_submitted == 1
+    assert health.logical_frames_sent == 0
+    assert health.packets_sent == 0
+
+
+def test_health_summary_is_json_serializable() -> None:
+    output, _sock = _enabled_udp_output()
+    send_all({"udp": output}, _strip_frame())
+
+    summary = health_summary({"udp": output})
+
+    json.dumps(summary)
+    assert summary["outputs"]["udp"]["healthy"] is True
+    assert summary["outputs"]["udp"]["logical_frames_submitted"] == 1
+    assert summary["outputs"]["udp"]["logical_frames_sent"] == 1
+    assert summary["totals"]["logical_frames_submitted"] == 1
+    assert summary["totals"]["logical_frames_sent"] == 1
+    assert summary["totals"]["packets_sent"] == 1
 
 
 @pytest.mark.parametrize("channel", ["r", "g", "b", "warm_white", "cool_white"])

@@ -39,8 +39,11 @@ class SimulatorOutput(LightOutput):
         with self._lock:
             self._buffer.append(frame)
             self._frames_sent += 1
+            self._health.logical_frames_sent += 1
+            self._health.mark_success()
             if len(self._buffer) > 1:
                 self._frames_dropped += 1
+                self._health.frames_dropped += 1
 
     def pop_latest(self) -> Optional[PixelFrame]:
         """Thread-safe: get the latest frame and drain all older ones.

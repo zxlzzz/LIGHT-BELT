@@ -26,6 +26,7 @@ from light_engine.outputs import (
     open_all,
     send_all,
     close_all,
+    health_summary,
 )
 from light_engine.outputs.transform import OutputTransform
 from light_engine.data.generators import SyntheticDataSource
@@ -293,6 +294,22 @@ class Engine:
         """Clean shutdown of all resources."""
         self._running = False
         self._run_end_wall = time.perf_counter()
+        try:
+            self._sequence += 1
+            safe_frame = OutputTransform.generate_safe_frame(
+                timestamp=self._timestamp,
+                sequence=self._sequence,
+                zone_ids=[zone["id"] for zone in self._zone_defs],
+                strips=self._strip_defs,
+            )
+            physical_safe_frame = self._physical_mapping.map(safe_frame)
+            send_all(
+                self._outputs,
+                RoutedFrame(logical=safe_frame, physical=physical_safe_frame),
+            )
+        except Exception as e:
+            logger.exception("Failed to send shutdown safe frame")
+            self._diagnostics["last_error"] = str(e)
         close_all(self._outputs)
         if self._video_reader:
             self._video_reader.close()
@@ -304,14 +321,7 @@ class Engine:
 
     def diagnostics(self) -> dict:
         """Return current diagnostic state."""
-        health = {}
-        for name, out in self._outputs.items():
-            health[name] = {
-                "healthy": out.health().healthy,
-                "frames_sent": out.health().frames_sent,
-                "last_error": out.health().last_error,
-            }
-        self._diagnostics["output_health"] = health
+        self._diagnostics["output_health"] = health_summary(self._outputs)
         return self._diagnostics
 
     def get_fps_stats(self) -> dict:

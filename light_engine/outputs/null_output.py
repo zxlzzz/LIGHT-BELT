@@ -11,7 +11,8 @@ class NullOutput(LightOutput):
         self._open = True
 
     def send_frame(self, frame: PixelFrame) -> None:
-        pass
+        self._health.logical_frames_sent += 1
+        self._health.mark_success()
 
     def close(self) -> None:
         self._open = False

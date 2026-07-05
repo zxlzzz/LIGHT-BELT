@@ -1,6 +1,7 @@
 """CLI module for light engine commands."""
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -9,6 +10,7 @@ from pathlib import Path
 from light_engine import __version__
 from light_engine.config import Config
 from light_engine.engine import Engine
+from light_engine.outputs import health_summary
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -18,6 +20,11 @@ def setup_logging(level: str = "INFO") -> None:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+
+
+def _print_health_summary(outputs: dict) -> None:
+    print("Output health summary:")
+    print(json.dumps(health_summary(outputs), indent=2, sort_keys=True))
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
@@ -44,6 +51,7 @@ def cmd_demo(args: argparse.Namespace) -> int:
     print(f"  Effective FPS: {stats['effective_fps']:.1f}")
     print(f"  Processing capacity: {stats['processing_capacity']:.1f} FPS")
     print(f"  P50: {stats['p50_ms']:.2f}ms  P95: {stats['p95_ms']:.2f}ms  P99: {stats['p99_ms']:.2f}ms")
+    _print_health_summary(engine._outputs)
 
     return 0
 
@@ -83,6 +91,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"\nCompleted: {stats['frame_count']} frames")
     print(f"  Effective FPS: {stats['effective_fps']:.1f}")
     print(f"  Processing capacity: {stats['processing_capacity']:.1f} FPS")
+    _print_health_summary(engine._outputs)
 
     return 0
 
@@ -143,6 +152,7 @@ def cmd_simulator(args: argparse.Namespace) -> int:
     print(f"\nEngine Generated: {sim_out.frames_sent()}")
     print(f"Simulator Rendered: {sim.frame_count}")
     print(f"Frames Dropped: {sim_out.frames_dropped()}")
+    _print_health_summary(engine._outputs)
 
     return 0
 
@@ -177,6 +187,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     print(f"Exporting to {args.output}...")
     engine.run(duration=args.duration, max_frames=args.max_frames)
     print(f"Exported {engine.frame_count} frames to {args.output}")
+    _print_health_summary(engine._outputs)
 
     return 0
 
@@ -217,6 +228,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     print(f"\n  Machine:    {os.environ.get('COMPUTERNAME', 'unknown')} ({os.name})")
     print(f"  Target:     RK3588 ARM64 Linux (30 FPS target)")
     print(f"  Verified:   Current machine only - NOT RK3588")
+    _print_health_summary(engine._outputs)
 
     return 0
 

@@ -26,6 +26,7 @@ class JsonOutput(LightOutput):
 
     def send_frame(self, frame: PixelFrame) -> None:
         if self._file is None:
+            self._health.frames_dropped += 1
             return
         data = {
             "timestamp": frame.timestamp,
@@ -57,6 +58,8 @@ class JsonOutput(LightOutput):
         else:
             self._file.write(json.dumps(data, ensure_ascii=False) + "\n")
         self._file.flush()
+        self._health.logical_frames_sent += 1
+        self._health.mark_success()
 
     def close(self) -> None:
         if self._file:

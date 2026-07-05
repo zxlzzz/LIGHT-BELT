@@ -134,13 +134,17 @@ class UdpOutput(LightOutput):
                 try:
                     self._socket.sendto(packet.encode(), (self._host, self._port))  # type: ignore
                     self._health.packets_sent += 1
+                    self._health.mark_success()
                 except Exception as e:
                     frame_ok = False
                     self._health.last_error = str(e)
-                    self._health.frames_dropped += 1
+                    self._health.packets_dropped += 1
                 offset += MAX_PIXELS_PER_PACKET
         if frame_ok:
-            self._health.frames_sent += 1
+            self._health.logical_frames_sent += 1
+            self._health.mark_success()
+        else:
+            self._health.frames_dropped += 1
 
     def close(self) -> None:
         if self._socket:

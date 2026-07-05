@@ -55,7 +55,8 @@ class TestFrameSequence:
 
         engine.run(max_frames=5)
 
-        assert [frame.sequence for frame in output.frames] == [1, 2, 3, 4, 5]
+        assert [frame.sequence for frame in output.frames] == [1, 2, 3, 4, 5, 6]
+        assert output.frames[-1].metadata["SAFE_STATE"] is True
 
     def test_engine_builds_routed_frame_before_output(self, monkeypatch):
         captured = []
@@ -74,13 +75,41 @@ class TestFrameSequence:
 
         engine.run(max_frames=1)
 
-        assert len(captured) == 1
+        assert len(captured) == 2
         assert isinstance(captured[0], RoutedFrame)
         assert captured[0].logical.sequence == 1
         assert captured[0].physical.sequence == 1
         assert captured[0].logical.timestamp == captured[0].physical.timestamp
         assert len(captured[0].physical.analog_commands) == 6
         assert len(captured[0].physical.digital_frames) == 1
+        assert captured[1].logical.sequence == 2
+        assert captured[1].logical.metadata["SAFE_STATE"] is True
+        assert all(
+            command.color.r == 0.0
+            and command.color.g == 0.0
+            and command.color.b == 0.0
+            and command.color.warm_white == 0.0
+            and command.color.cool_white == 0.0
+            for command in captured[1].physical.analog_commands
+        )
+
+    def test_shutdown_closes_outputs_when_safe_frame_send_fails(self, monkeypatch):
+        def failing_send_all(_outputs, _frame):
+            raise RuntimeError("safe send failed")
+
+        monkeypatch.setattr(engine_module, "send_all", failing_send_all)
+        Config.reset()
+        config = Config()
+        engine = Engine(config)
+        output = NullOutput()
+        output.open()
+        engine._outputs = {"null": output}
+
+        engine._shutdown()
+
+        assert output.is_open() is False
+        assert engine.diagnostics()["running"] is False
+        assert engine.diagnostics()["last_error"] == "safe send failed"
 
 
 class TestMaxFramesLimit:

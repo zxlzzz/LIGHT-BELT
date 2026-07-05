@@ -11,6 +11,7 @@ Provides a unified LightOutput interface and concrete implementations:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import time
 from typing import Any, Optional
 
 from light_engine.models import PixelFrame, RoutedFrame
@@ -22,10 +23,32 @@ class OutputHealth:
     def __init__(self) -> None:
         self.healthy: bool = True
         self.last_error: Optional[str] = None
-        self.frames_sent: int = 0
+        self.logical_frames_submitted: int = 0
+        self.logical_frames_sent: int = 0
         self.packets_sent: int = 0
         self.frames_dropped: int = 0
-        self.errors: list[str] = []
+        self.packets_dropped: int = 0
+        self.last_success_time: float = 0.0
+
+    @property
+    def frames_sent(self) -> int:
+        """Backward-compatible read-only alias for logical_frames_sent."""
+        return self.logical_frames_sent or self.logical_frames_submitted
+
+    def mark_success(self) -> None:
+        self.last_success_time = time.time()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "healthy": self.healthy,
+            "last_error": self.last_error,
+            "logical_frames_submitted": self.logical_frames_submitted,
+            "logical_frames_sent": self.logical_frames_sent,
+            "packets_sent": self.packets_sent,
+            "frames_dropped": self.frames_dropped,
+            "packets_dropped": self.packets_dropped,
+            "last_success_time": self.last_success_time,
+        }
 
 
 class LightOutput(ABC):
@@ -132,22 +155,35 @@ def send_all(outputs: dict[str, LightOutput], frame: PixelFrame | RoutedFrame) -
     """Send frame to all open outputs, isolating failures."""
     for name, output in outputs.items():
         health = output.health()
+        health.logical_frames_submitted += 1
         if not health.healthy:
             continue
         try:
-            frames_before = health.frames_sent
-            drops_before = health.frames_dropped
             output.send_frame(_legacy_frame(frame))
-            if (
-                health.frames_sent == frames_before
-                and health.frames_dropped == drops_before
-            ):
-                health.frames_sent += 1
         except Exception as e:
             health.healthy = False
             health.last_error = str(e)
-            health.frames_dropped += 1
-            health.errors.append(str(e))
+
+
+def health_summary(outputs: dict[str, LightOutput]) -> dict[str, Any]:
+    """Return a JSON-serializable health summary for all outputs."""
+    per_output = {name: output.health().to_dict() for name, output in outputs.items()}
+    totals = {
+        "outputs": len(outputs),
+        "healthy_outputs": sum(1 for item in per_output.values() if item["healthy"]),
+        "logical_frames_submitted": sum(
+            item["logical_frames_submitted"] for item in per_output.values()
+        ),
+        "logical_frames_sent": sum(
+            item["logical_frames_sent"] for item in per_output.values()
+        ),
+        "packets_sent": sum(item["packets_sent"] for item in per_output.values()),
+        "frames_dropped": sum(item["frames_dropped"] for item in per_output.values()),
+        "packets_dropped": sum(
+            item["packets_dropped"] for item in per_output.values()
+        ),
+    }
+    return {"outputs": per_output, "totals": totals}
 
 
 def close_all(outputs: dict[str, LightOutput]) -> None:
