@@ -88,6 +88,8 @@ def run_process(
             [executable, *command[1:]],
             cwd=cwd,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             input=input_text,
             capture_output=True,
             timeout=timeout,
@@ -359,39 +361,78 @@ def create_worktree(
     return worktree_path, agent_branch
 
 
+def _copy_or_link_file(source: str, destination: str) -> str:
+    try:
+        os.link(source, destination)
+        return destination
+    except OSError:
+        return shutil.copy2(source, destination)
+
+
 def ensure_worktree_python(repo_root: Path, worktree_path: Path) -> Path:
     source = (repo_root / ".python").resolve()
     destination = worktree_path / ".python"
 
     if destination.exists():
-        return destination / "python.exe"
-
-    if os.name == "nt":
-        result = run_process(
-            [
-                "cmd",
-                "/c",
-                "mklink",
-                "/J",
-                str(destination),
-                str(source),
-            ],
-            cwd=worktree_path,
+        python_executable = destination / (
+            "python.exe" if os.name == "nt" else "bin/python"
         )
-        if result.returncode != 0:
-            raise PipelineError(
-                "Failed to create .python junction in the worktree.\n"
-                f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-            )
-    else:
-        destination.symlink_to(source, target_is_directory=True)
+        if python_executable.exists():
+            return python_executable
+        raise PipelineError(
+            f"Existing worktree Python directory is incomplete: {destination}"
+        )
 
-    python_executable = destination / ("python.exe" if os.name == "nt" else "bin/python")
+    try:
+        shutil.copytree(
+            source,
+            destination,
+            copy_function=_copy_or_link_file,
+            symlinks=True,
+        )
+    except Exception as exc:
+        if destination.exists():
+            shutil.rmtree(destination, ignore_errors=True)
+        raise PipelineError(
+            "Failed to mirror the bundled .python environment into the "
+            f"worktree: {exc}"
+        ) from exc
+
+    python_executable = destination / (
+        "python.exe" if os.name == "nt" else "bin/python"
+    )
     if not python_executable.exists():
         raise PipelineError(
-            f"Worktree Python link was created but interpreter is missing: "
+            f"Worktree Python mirror is missing its interpreter: "
             f"{python_executable}"
         )
+
+    verification = run_process(
+        [
+            str(python_executable),
+            "-c",
+            (
+                "import pathlib,sys,light_engine;"
+                "exe=pathlib.Path(sys.executable).resolve();"
+                "cwd=pathlib.Path.cwd().resolve();"
+                "pkg=pathlib.Path(light_engine.__file__).resolve();"
+                "assert exe.name.lower()=='python.exe';"
+                "assert exe.parent.name=='.python';"
+                "assert exe.parent.parent==cwd;"
+                "assert str(pkg).startswith(str(cwd));"
+                "print('WORKTREE_PROJECT_PYTHON_OK')"
+            ),
+        ],
+        cwd=worktree_path,
+        timeout=120,
+    )
+    if verification.returncode != 0:
+        raise PipelineError(
+            "Worktree Python verification failed.\n"
+            f"stdout:\n{verification.stdout}\n"
+            f"stderr:\n{verification.stderr}"
+        )
+
     return python_executable
 
 
