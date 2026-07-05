@@ -21,6 +21,8 @@ Complete Phase 6 from `docs/IMPLEMENTATION_PLAN.md`: production/memory/fake mode
 - tests/test_serial.py
 - tests/test_udp.py
 - tests/test_pipeline.py
+- tests/test_legacy_compat.py
+- tests/test_phased_output_matrix.py
 - docs/IMPLEMENTATION_PLAN.md
 - docs/architecture.md
 
