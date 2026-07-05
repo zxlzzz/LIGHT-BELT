@@ -71,7 +71,7 @@ Keep protocol golden vectors shared between host and firmware documentation/test
 
 On Windows, this repository must use only the bundled interpreter:
 
-`.\\.python\\python.exe`
+`.\\.python\\Scripts\\python.exe`
 
 Never invoke any of the following on Windows:
 
@@ -83,7 +83,7 @@ Never invoke any of the following on Windows:
 
 All Python commands must begin with:
 
-`.\\.python\\python.exe`
+`.\\.python\\Scripts\\python.exe`
 
 Before the first Python command in each Claude Code session, verify the interpreter.
 Codex on Windows may remap the repository into a sandbox path such as
@@ -91,12 +91,14 @@ Codex on Windows may remap the repository into a sandbox path such as
 require `sys.executable` to contain the original drive path or repository
 directory name.
 
-`.\\.python\\python.exe -c "import sys, pathlib, light_engine; exe=pathlib.Path(sys.executable).resolve(); pkg=pathlib.Path(light_engine.__file__).resolve(); cwd=pathlib.Path.cwd().resolve(); print('executable=', exe); print('package=', pkg); assert exe.name.lower() == 'python.exe'; assert exe.parent.name == '.python'; assert exe.parent.parent == cwd; assert str(pkg).startswith(str(cwd)); print('PROJECT_PYTHON_OK')"`
+`.\\.python\\Scripts\\python.exe -c "import sys, pathlib, light_engine; cwd=pathlib.Path.cwd().resolve(); exe=pathlib.Path(sys.executable).resolve(); pkg=pathlib.Path(light_engine.__file__).resolve(); candidates=[cwd/'.python'/'Scripts'/'python.exe', cwd/'.python'/'python.exe']; existing=[c for c in candidates if c.exists()]; assert existing, 'No bundled Python found'; assert any(c.resolve()==exe for c in existing), 'Executable mismatch'; assert exe.name.lower()=='python.exe'; assert str(pkg).startswith(str(cwd)); print('executable=', exe); print('package=', pkg); print('PROJECT_PYTHON_OK')"`
 
-The command is valid when it was invoked as `.\\.python\\python.exe`, the
-resolved executable is the `.python\\python.exe` under the current workspace
-mapping, `light_engine` imports successfully, and the imported package file is
-also under the current workspace mapping.
+The command is valid when it was invoked as `.\\.python\\Scripts\\python.exe`,
+the current workspace contains `.python\\Scripts\\python.exe` (or the legacy
+`.python\\python.exe`), at least one of those candidate paths resolves to the
+same file as `sys.executable` (tolerating Windows Junctions that share a venv
+across worktrees), `light_engine` imports successfully, and the imported
+package file is also under the current workspace mapping.
 
 If the bundled interpreter does not exist or cannot run, stop and report the error. Do not fall back to another Python installation.
 
@@ -104,15 +106,15 @@ If the bundled interpreter does not exist or cannot run, stop and report the err
 
 Before editing:
 
-`.\\.python\\python.exe -m pytest -q`
+`.\\.python\\Scripts\\python.exe -m pytest -q`
 
 After each coherent change, run relevant tests using the same bundled interpreter.
 
 Before finishing, run:
 
-`.\\.python\\python.exe -m pytest -q`
+`.\\.python\\Scripts\\python.exe -m pytest -q`
 
-`.\\.python\\python.exe -m light_engine benchmark --effect video_audio_fusion --frames 1800`
+`.\\.python\\Scripts\\python.exe -m light_engine benchmark --effect video_audio_fusion --frames 1800`
 
 If firmware projects exist or are added:
 

@@ -34,13 +34,15 @@ require `sys.executable` to contain the original drive path or repository
 directory name.
 
 ```powershell
-.\.python\Scripts\python.exe -c "import sys, pathlib, light_engine; exe=pathlib.Path(sys.executable).resolve(); pkg=pathlib.Path(light_engine.__file__).resolve(); cwd=pathlib.Path.cwd().resolve(); print('executable=', exe); print('package=', pkg); assert exe.name.lower() == 'python.exe'; assert exe.parent.name == '.python'; assert exe.parent.parent == cwd; assert str(pkg).startswith(str(cwd)); print('PROJECT_PYTHON_OK')"
+.\.python\Scripts\python.exe -c "import sys, pathlib, light_engine; cwd=pathlib.Path.cwd().resolve(); exe=pathlib.Path(sys.executable).resolve(); pkg=pathlib.Path(light_engine.__file__).resolve(); candidates=[cwd/'.python'/'Scripts'/'python.exe', cwd/'.python'/'python.exe']; existing=[c for c in candidates if c.exists()]; assert existing, 'No bundled Python found'; assert any(c.resolve()==exe for c in existing), 'Executable mismatch'; assert exe.name.lower()=='python.exe'; assert str(pkg).startswith(str(cwd)); print('executable=', exe); print('package=', pkg); print('PROJECT_PYTHON_OK')"
 ```
 
 The command is valid when it was invoked as `.\.python\Scripts\python.exe`, the
-resolved executable is the `.python\python.exe` under the current workspace
-mapping, `light_engine` imports successfully, and the imported package file is
-also under the current workspace mapping.
+current workspace contains `.python\Scripts\python.exe` (or the legacy
+`.python\python.exe`), at least one of those candidate paths resolves to the
+same file as `sys.executable` (tolerating Windows Junctions that share a venv
+across worktrees), `light_engine` imports successfully, and the imported
+package file is also under the current workspace mapping.
 
 If the bundled interpreter is missing or fails, stop and report the error. Do
 not fall back to another Python.
