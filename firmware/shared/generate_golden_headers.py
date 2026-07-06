@@ -47,9 +47,38 @@ def _generate(input_path: Path, output_path: Path, symbol_prefix: str) -> None:
     output_path.write_text(new_text, encoding="utf-8", newline="\n")
 
 
+def _generate_project_header(
+    output_path: Path,
+    rs485_header: str | None = None,
+    udp_header: str | None = None,
+) -> None:
+    guard = _header_guard(output_path.name)
+    lines = [
+        "// Generated from firmware/shared golden-vector headers. Do not edit.",
+        "#ifndef " + guard,
+        "#define " + guard,
+        "",
+    ]
+    if rs485_header:
+        lines.append(f'#include "{rs485_header}"')
+    if udp_header:
+        lines.append(f'#include "{udp_header}"')
+    lines.extend(["", "#endif", ""])
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("\n".join(lines), encoding="utf-8", newline="\n")
+
+
 def main() -> None:
     _generate(ROOT / "rs485_v2_golden.json", ROOT / "rs485_v2_golden.h", "RS485_V2_GOLDEN")
     _generate(ROOT / "udp_v2_golden.json", ROOT / "udp_v2_golden.h", "UDP_V2_GOLDEN")
+    _generate_project_header(
+        ROOT.parent / "stm32_rgbcct_node" / "test" / "golden_vectors.h",
+        rs485_header="../../shared/rs485_v2_golden.h",
+    )
+    _generate_project_header(
+        ROOT.parent / "esp32_ws2811_node" / "test" / "golden_vectors.h",
+        udp_header="../../shared/udp_v2_golden.h",
+    )
 
 
 if __name__ == "__main__":

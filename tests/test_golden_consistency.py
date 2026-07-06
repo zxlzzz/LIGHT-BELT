@@ -61,3 +61,20 @@ def test_header_generator_is_deterministic():
     assert first == second
     assert "0xA5, 0x5A" in first["rs485_v2_golden.h"]
     assert "0x4C, 0x45" in first["udp_v2_golden.h"]
+
+
+def test_project_golden_headers_are_generated():
+    subprocess.run(
+        [".\\.python\\Scripts\\python.exe", "firmware/shared/generate_golden_headers.py"],
+        check=True,
+    )
+    stm32 = Path("firmware/stm32_rgbcct_node/test/golden_vectors.h").read_text(
+        encoding="utf-8"
+    )
+    esp32 = Path("firmware/esp32_ws2811_node/test/golden_vectors.h").read_text(
+        encoding="utf-8"
+    )
+    assert "Generated from firmware/shared" in stm32
+    assert "../../shared/rs485_v2_golden.h" in stm32
+    assert "Generated from firmware/shared" in esp32
+    assert "../../shared/udp_v2_golden.h" in esp32

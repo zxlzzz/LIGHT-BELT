@@ -69,3 +69,6 @@ secrets/
 .python-runtime-*.zip
 
 .tmp-pip/
+
+# Local firmware credentials
+firmware/**/src/config.local.h
