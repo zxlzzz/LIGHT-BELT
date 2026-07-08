@@ -27,10 +27,12 @@
 ## Data Flow
 
 1. **Input**: Media files or SyntheticDataSource produce raw frames/samples
-2. **Analysis**: VideoAnalyzer and AudioAnalyzer extract features
-3. **Context**: EffectContext bundles features with timing and parameters
-4. **Effect**: Active effect processes context → PixelFrame
-5. **Output**: PixelFrame sent to all enabled output backends
+2. **Analysis**: VideoAnalyzer and AudioAnalyzer extract low-level features
+3. **Music control**: MusicControlAnalyzer derives bounded control state from
+   AudioFeatures history without selecting effects
+4. **Context**: EffectContext bundles features with timing and parameters
+5. **Effect**: Active effect processes context → PixelFrame
+6. **Output**: PixelFrame sent to all enabled output backends
 
 ## Virtual Paths
 

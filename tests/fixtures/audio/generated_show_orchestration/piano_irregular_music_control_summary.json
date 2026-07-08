@@ -1,0 +1,33 @@
+{
+  "final_state": {
+    "bass_ambient": 3.5576991456484084e-05,
+    "bass_pulse": 0.00021342752705429206,
+    "beat_phase": 0.0,
+    "beat_regularity": 0.0,
+    "beat_strength": 0.00021342752705429206,
+    "energy": 0.40055633755962833,
+    "energy_trend": 0.13547256931922436,
+    "spectral_motion": 0.0,
+    "tempo_bpm": 0.0,
+    "tempo_confidence": 0.0,
+    "timestamp": 9.983333333333409,
+    "transient": 0.00016007064529071903
+  },
+  "fixture": "piano_irregular.wav",
+  "summary": {
+    "bass_ambient_max": 0.18731225604447754,
+    "bass_pulse_max": 1.0,
+    "beat_regularity_mean_after_warmup": 0.0,
+    "duration_seconds": 9.983333333333409,
+    "energy_max": 0.9963134693317006,
+    "energy_min": 0.0,
+    "energy_trend_mean_after_warmup": -0.42041559993786565,
+    "frames": 600,
+    "history_bound": 2488,
+    "history_size": 1230,
+    "spectral_motion_max": 1.0,
+    "tempo_bpm_median_after_warmup": 0.0,
+    "tempo_confidence_mean_after_warmup": 0.0,
+    "transient_max": 1.0
+  }
+}

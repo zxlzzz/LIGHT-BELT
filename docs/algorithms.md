@@ -67,6 +67,36 @@
 - Rolling history of RMS and band values
 - P95 normalization to handle volume differences between tracks
 
+## Music Control Features
+
+Music control consumes `AudioFeatures` history and emits immutable
+`MusicControlState` values. It does not select or switch lighting effects.
+
+### Bounds and Windows
+- Short history: 2 seconds, capped at 128 frames
+- Medium history: 8 seconds, capped at 488 frames
+- Long history: 30 seconds, capped at 1808 frames
+- Beat-event history: capped at 64 timestamps
+- Total stored history bound: 2488 entries
+- Tempo support range: 60-180 BPM
+- Confidence, phase, strength, regularity, energy, transient, bass ambience,
+  bass pulse, and spectral motion are clamped to [0,1]
+- Energy trend is clamped to [-1,1]
+
+### Bass Ambience and Pulse
+- `bass_ambient` follows sustained low-frequency level with a slow-rising
+  baseline
+- `bass_pulse` is positive excess above that baseline
+- Sustained bass can keep ambience high, but pulse decays after the attack
+
+### Tempo and Confidence
+- Beat candidates require positive envelope or bass excess and a refractory
+  interval compatible with 60-180 BPM
+- BPM is the median interval of bounded beat-event history
+- Confidence combines interval inlier ratio, regularity, and minimum evidence
+- Low-information or irregular material reports low confidence instead of a
+  fabricated strong BPM
+
 ## Color Conversions
 
 ### RGB ↔ HSV
