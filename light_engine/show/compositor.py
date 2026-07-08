@@ -20,6 +20,7 @@ from light_engine.models import (
     RGBCCTColor,
     ZoneOutput,
 )
+from light_engine.show.adaptive_selector import AdaptiveEffectSelector, fixed_decision
 from light_engine.show.models import Cue, ShowDefinition, TargetSelector
 
 
@@ -353,24 +354,56 @@ class CueRenderJob:
         effect_factory: Callable[[str], BaseEffect] = create_effect,
         cue_seed: int = 0,
     ):
-        if cue.effect.mode != "fixed" or cue.effect.name is None:
-            raise ValueError("Phase 13 renderer supports fixed effect cues only")
+        if cue.effect.mode == "fixed" and cue.effect.name is None:
+            raise ValueError("fixed effect cue requires an effect name")
+        if cue.effect.mode == "adaptive" and cue.effect.fallback is None:
+            raise ValueError("adaptive effect cue requires an explicit fallback")
         self.cue = cue
         self.declaration_index = declaration_index
         self.resolved = resolver.resolve(cue.target)
         self._effect_factory = effect_factory
         self._injected_effect = effect is not None
         self._cue_seed = cue_seed
+        self._selector = (
+            AdaptiveEffectSelector(cue) if cue.effect.mode == "adaptive" else None
+        )
         self.effect = effect if effect is not None else self._create_effect()
 
     def render(self, ctx: EffectContext) -> FrameContribution:
+        effect = self.effect
+        decision = None
+        speed = ctx.speed
+        if self._selector is not None:
+            decision = self._selector.evaluate(ctx.timestamp, ctx.music_control_state)
+            speed = decision.speed
+            if effect is None or effect.name != decision.selected_effect:
+                effect = self._create_effect(decision.selected_effect)
+                self.effect = effect
+        else:
+            decision = fixed_decision(self.cue, ctx.timestamp)
+        if effect is None:
+            raise RuntimeError(f"cue {self.cue.id!r} has no active effect")
         scoped = make_scoped_context(
             ctx,
             self.resolved,
             cue=self.cue,
             declaration_index=self.declaration_index,
         )
-        frame = self.effect.process(scoped)
+        scoped_params = dict(scoped.mode_parameters)
+        scoped_params.update(
+            {
+                "selection_decision": decision,
+                "music_state": decision.music_state,
+                "sync_mode": decision.sync_mode,
+                "tempo_period": decision.tempo_period,
+            }
+        )
+        scoped = replace(
+            scoped,
+            speed=speed,
+            mode_parameters=MappingProxyType(scoped_params),
+        )
+        frame = effect.process(scoped)
         return frame_to_contribution(
             frame,
             resolved=self.resolved,
@@ -382,17 +415,22 @@ class CueRenderJob:
         )
 
     def reset(self) -> None:
+        if self._selector is not None:
+            self._selector.reset()
         if self._injected_effect:
             self.effect.reset()
         else:
             self.effect = self._create_effect()
 
-    def _create_effect(self) -> BaseEffect:
-        assert self.cue.effect.name is not None
+    def _create_effect(self, name: str | None = None) -> BaseEffect | None:
+        if name is None:
+            name = self.cue.effect.name
+        if name is None:
+            return None
         state = random.getstate()
         try:
             random.seed(self._cue_seed)
-            return self._effect_factory(self.cue.effect.name)
+            return self._effect_factory(name)
         finally:
             random.setstate(state)
 

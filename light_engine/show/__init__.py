@@ -1,5 +1,12 @@
 """Strict versioned show schema loader."""
 
+from light_engine.show.adaptive_selector import (
+    AdaptiveEffectSelector,
+    REASON_CODES,
+    SelectionDecision,
+    classify_music_state,
+    choose_sync,
+)
 from light_engine.show.compositor import (
     AnalogContribution,
     CueRenderJob,
@@ -31,6 +38,7 @@ from light_engine.show.models import (
 
 __all__ = [
     "AnalogContribution",
+    "AdaptiveEffectSelector",
     "AudioControlSpec",
     "Cue",
     "CueRenderJob",
@@ -38,6 +46,8 @@ __all__ = [
     "EffectSpec",
     "FrameContribution",
     "ResolvedTarget",
+    "REASON_CODES",
+    "SelectionDecision",
     "ShowRuntime",
     "ShowDefinition",
     "ShowValidationError",
@@ -46,7 +56,9 @@ __all__ = [
     "TargetSelector",
     "TransitionSpec",
     "black_base_frame",
+    "classify_music_state",
     "compose_frame",
+    "choose_sync",
     "frame_to_contribution",
     "load_show",
     "make_scoped_context",

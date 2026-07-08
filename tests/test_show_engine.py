@@ -113,14 +113,13 @@ def test_validate_show_creates_no_engine_or_outputs(monkeypatch):
     assert result == 0
 
 
-def test_run_show_rejects_adaptive_runtime_without_opening_outputs(monkeypatch):
-    opened = []
+def test_run_show_accepts_adaptive_runtime(monkeypatch):
+    sent = []
 
-    def forbidden_init_outputs(self):
-        opened.append(True)
-        raise AssertionError("outputs must not open after invalid show runtime")
+    def capture_send_all(_outputs, frame):
+        sent.append(frame)
 
-    monkeypatch.setattr(Engine, "init_outputs", forbidden_init_outputs)
+    monkeypatch.setattr(engine_module, "send_all", capture_send_all)
     Config.reset()
     args = Namespace(
         config=None,
@@ -136,5 +135,5 @@ def test_run_show_rejects_adaptive_runtime_without_opening_outputs(monkeypatch):
 
     result = cli.cmd_run(args)
 
-    assert result == 1
-    assert opened == []
+    assert result == 0
+    assert sent

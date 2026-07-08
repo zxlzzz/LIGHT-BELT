@@ -48,6 +48,7 @@ class AudioControlSpec:
     beat_regularity_min: float = 0.0
     no_beat_fallback: str = "hold"
     beats_per_cycle: float | None = None
+    beat_subdivision: float = 1.0
     speed_smoothing_seconds: float = 0.0
     state_confirmation_seconds: float = 0.0
     min_effect_hold: float = 0.0

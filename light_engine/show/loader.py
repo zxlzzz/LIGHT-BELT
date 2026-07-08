@@ -244,6 +244,8 @@ def _effect(value: Any, path: str) -> EffectSpec:
     for state, effect_name in allowed.items():
         resolved[state] = _effect_name(effect_name, f"{path}.allowed.{state}")
     fallback = _effect_name(effect.get("fallback"), f"{path}.fallback")
+    if fallback not in set(resolved.values()):
+        raise ShowValidationError(f"{path}.fallback", fallback, "must be one of allowed effects")
     return EffectSpec(mode=mode, allowed=resolved, fallback=fallback)
 
 
@@ -290,6 +292,7 @@ def _audio_control(value: Any, path: str) -> AudioControlSpec:
             "beat_regularity_min",
             "no_beat_fallback",
             "beats_per_cycle",
+            "beat_subdivision",
             "speed_smoothing_seconds",
             "state_confirmation_seconds",
             "min_effect_hold",
@@ -306,6 +309,11 @@ def _audio_control(value: Any, path: str) -> AudioControlSpec:
             None
             if "beats_per_cycle" not in audio
             else _number(audio["beats_per_cycle"], f"{path}.beats_per_cycle", min_exclusive=0.0)
+        ),
+        beat_subdivision=_choice_number(
+            audio.get("beat_subdivision", 1.0),
+            f"{path}.beat_subdivision",
+            {0.25, 0.5, 1.0, 2.0, 4.0},
         ),
         speed_smoothing_seconds=_number(audio.get("speed_smoothing_seconds", 0.0), f"{path}.speed_smoothing_seconds", minimum=0.0),
         state_confirmation_seconds=_number(audio.get("state_confirmation_seconds", 0.0), f"{path}.state_confirmation_seconds", minimum=0.0),
@@ -358,6 +366,14 @@ def _choice(value: Any, path: str, choices: Iterable[str]) -> str:
     if not isinstance(value, str) or value not in set(choices):
         raise ShowValidationError(path, value, f"must be one of {sorted(choices)}")
     return value
+
+
+def _choice_number(value: Any, path: str, choices: Iterable[float]) -> float:
+    number = _number(value, path, min_exclusive=0.0)
+    allowed = set(choices)
+    if number not in allowed:
+        raise ShowValidationError(path, value, f"must be one of {sorted(allowed)}")
+    return number
 
 
 def _effect_name(value: Any, path: str) -> str:

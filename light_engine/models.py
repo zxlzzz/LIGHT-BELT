@@ -196,6 +196,7 @@ class EffectContext:
     sequence: int = 0
     video_features: Optional[VideoFeatures] = None
     audio_features: Optional[AudioFeatures] = None
+    music_control_state: Optional[MusicControlState] = None
     speed: float = 1.0
     intensity: float = 1.0
     mode_parameters: dict[str, Any] = field(default_factory=dict)
