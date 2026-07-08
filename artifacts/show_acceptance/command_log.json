@@ -1,0 +1,24 @@
+{
+  "commands": [
+    {
+      "command": "git rev-parse HEAD",
+      "return_code": 0,
+      "summary": "6b1369a475e3267b3b8c85da04845d696f00b69d"
+    },
+    {
+      "command": "git status --short",
+      "return_code": 0,
+      "summary": "?? .agent/phase17-recovered-filtered.patch\n?? .agent/phase17-recovered.patch\n?? artifacts/\n?? config/layout_acceptance.yaml\n?? config/show_acceptance.yaml\n?? docs/show_acceptance_report.md\n?? scripts/show_acceptance.py\n?? tests/fixtures/audio/acceptance/\n?? tests/fixtures/show/\n?? tests/fixtures/video/\n?? tests/test_show_e2e_acceptance.py"
+    }
+  ],
+  "script_argv": [
+    "scripts/show_acceptance.py",
+    "--show",
+    "config/show_acceptance.yaml",
+    "--layout",
+    "config/layout_acceptance.yaml",
+    "--realtime-soak",
+    "300"
+  ],
+  "summary_path": "artifacts\\show_acceptance\\summary.json"
+}

@@ -1,0 +1,268 @@
+[
+  {
+    "frame_index": 0,
+    "logical_sequence": 0,
+    "physical_sequence": 0,
+    "rs485_sequences": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "rs485_sha256": "74bb1ae02c1bf1288030b794d46ee4e0ef4a0779be3b318e03f99265e55351f4",
+    "timestamp": 0.0,
+    "udp_sequences": [
+      0
+    ],
+    "udp_sha256": "d05c68f4b677762a66d69b54842ad5daa9f99399ef3d3e26b0f6af5db8be079c"
+  },
+  {
+    "frame_index": 71,
+    "logical_sequence": 71,
+    "physical_sequence": 71,
+    "rs485_sequences": [
+      71,
+      71,
+      71,
+      71,
+      71,
+      71
+    ],
+    "rs485_sha256": "dcbf5031e6cbbe05a3a1e73ce9915784648134c212b81c57564bc0362948acf3",
+    "timestamp": 2.366666667,
+    "udp_sequences": [
+      71
+    ],
+    "udp_sha256": "8cd4248c89e47f9680d4ae44d5375df0581d43d8530c5430d27366b2d24567be"
+  },
+  {
+    "frame_index": 72,
+    "logical_sequence": 72,
+    "physical_sequence": 72,
+    "rs485_sequences": [
+      72,
+      72,
+      72,
+      72,
+      72,
+      72
+    ],
+    "rs485_sha256": "bb1ef3d757bf4670c3fce24053a01fbefa2c8157b00b40e392bd1233b2dcfec1",
+    "timestamp": 2.4,
+    "udp_sequences": [
+      72
+    ],
+    "udp_sha256": "263db99e02864955279c232183213b9c1b6e8a8fd0053b9bc2faecfd161270b1"
+  },
+  {
+    "frame_index": 73,
+    "logical_sequence": 73,
+    "physical_sequence": 73,
+    "rs485_sequences": [
+      73,
+      73,
+      73,
+      73,
+      73,
+      73
+    ],
+    "rs485_sha256": "ec003fffdd009a5090773a524daa8f8560711d86307229e795a8c98da94062db",
+    "timestamp": 2.433333333,
+    "udp_sequences": [
+      73
+    ],
+    "udp_sha256": "dca6165f14d8c31f2191bfd5627579b6221a7a77886a02ff23ce2f4ed67eef5a"
+  },
+  {
+    "frame_index": 360,
+    "logical_sequence": 360,
+    "physical_sequence": 360,
+    "rs485_sequences": [
+      104,
+      104,
+      104,
+      104,
+      104,
+      104
+    ],
+    "rs485_sha256": "88612cb42463a0fac129c7f8ee0975a5f3137c67aeba1b6726ded05207762ef5",
+    "timestamp": 12.0,
+    "udp_sequences": [
+      360
+    ],
+    "udp_sha256": "525497a1049638ed545bb1c7a3c8b095079b018105a7b7650eb05060f2653e1a"
+  },
+  {
+    "frame_index": 3000,
+    "logical_sequence": 3000,
+    "physical_sequence": 3000,
+    "rs485_sequences": [
+      184,
+      184,
+      184,
+      184,
+      184,
+      184
+    ],
+    "rs485_sha256": "4fd34cf9c80a164484b9951ecb04bd456c3938b8c7e4102fa3569e6a021fde4e",
+    "timestamp": 100.0,
+    "udp_sequences": [
+      3000
+    ],
+    "udp_sha256": "b6e685bc0d86395919a5da515b3523b53946c2da125a17d118e90373db114dfc"
+  },
+  {
+    "frame_index": 3060,
+    "logical_sequence": 3060,
+    "physical_sequence": 3060,
+    "rs485_sequences": [
+      244,
+      244,
+      244,
+      244,
+      244,
+      244
+    ],
+    "rs485_sha256": "ca9549ed8cb4600bbea56e40cfbb60863a15e30aaf640f1e656bcc97b9c65928",
+    "timestamp": 102.0,
+    "udp_sequences": [
+      3060
+    ],
+    "udp_sha256": "9698fc87eb2013c1446596a1c6910cb5c127a7e53918d58a9f880f248d8c3c91"
+  },
+  {
+    "frame_index": 3120,
+    "logical_sequence": 3120,
+    "physical_sequence": 3120,
+    "rs485_sequences": [
+      48,
+      48,
+      48,
+      48,
+      48,
+      48
+    ],
+    "rs485_sha256": "c00614845806bae6b8c060d437c1e680bf916e38838d3fe4c19483b48ac6e768",
+    "timestamp": 104.0,
+    "udp_sequences": [
+      3120
+    ],
+    "udp_sha256": "55627693dcfcf33244b127fffb412798b39f7b3f7b37d78cc9bfe763f715bdd8"
+  },
+  {
+    "frame_index": 3240,
+    "logical_sequence": 3240,
+    "physical_sequence": 3240,
+    "rs485_sequences": [
+      168,
+      168,
+      168,
+      168,
+      168,
+      168
+    ],
+    "rs485_sha256": "0a9dc511eed2c4b34c10f35d97c90df4aa26c7cf278f6097675f906387916101",
+    "timestamp": 108.0,
+    "udp_sequences": [
+      3240
+    ],
+    "udp_sha256": "e6529a19428d6f69f812f9938f3a4bde83009ebfefa23ddc6bca24927ebffca5"
+  },
+  {
+    "frame_index": 3600,
+    "logical_sequence": 3600,
+    "physical_sequence": 3600,
+    "rs485_sequences": [
+      16,
+      16,
+      16,
+      16,
+      16,
+      16
+    ],
+    "rs485_sha256": "38755b953af5ed64bd2a533413cb371d8983bc886747c86d42eeb77f67e2bf45",
+    "timestamp": 120.0,
+    "udp_sequences": [
+      3600
+    ],
+    "udp_sha256": "ae51db1e349c9f237378e78aeb28528aaf04b21b23fbf60e6a7b730b1e4de517"
+  },
+  {
+    "frame_index": 4800,
+    "logical_sequence": 4800,
+    "physical_sequence": 4800,
+    "rs485_sequences": [
+      192,
+      192,
+      192,
+      192,
+      192,
+      192
+    ],
+    "rs485_sha256": "fd5d95b49f72a78e0e51fa982cad853da6f7898fbf8be2ab753ff0b9dce1671f",
+    "timestamp": 160.0,
+    "udp_sequences": [
+      4800
+    ],
+    "udp_sha256": "64d7aa63f0489810de86264d65b25cd5745b9b3a8a2426fc43f89e14cf01bbc7"
+  },
+  {
+    "frame_index": 6000,
+    "logical_sequence": 6000,
+    "physical_sequence": 6000,
+    "rs485_sequences": [
+      112,
+      112,
+      112,
+      112,
+      112,
+      112
+    ],
+    "rs485_sha256": "a5721f13f59d0b2cc38151457c46a012717321857da062ae5b97a66a405c27aa",
+    "timestamp": 200.0,
+    "udp_sequences": [
+      6000
+    ],
+    "udp_sha256": "d7d9cbaeb72f5c8bf08426148b973a0979b778ad2c5bc09b040a449499488f06"
+  },
+  {
+    "frame_index": 7200,
+    "logical_sequence": 7200,
+    "physical_sequence": 7200,
+    "rs485_sequences": [
+      32,
+      32,
+      32,
+      32,
+      32,
+      32
+    ],
+    "rs485_sha256": "7a1f5d3df20422cc94503d1881e1ab7e63c9ce0c29971480007e84e369d7caf9",
+    "timestamp": 240.0,
+    "udp_sequences": [
+      7200
+    ],
+    "udp_sha256": "93f720515c3be457d57546b3e831b253888d3e30805aa443036b37ddc0a412ab"
+  },
+  {
+    "frame_index": 8999,
+    "logical_sequence": 8999,
+    "physical_sequence": 8999,
+    "rs485_sequences": [
+      39,
+      39,
+      39,
+      39,
+      39,
+      39
+    ],
+    "rs485_sha256": "aad7f4764ce9497b22f4d73fb51a00155c7096aee8363228c11a7ccfa9c0aae2",
+    "timestamp": 299.966666667,
+    "udp_sequences": [
+      8999
+    ],
+    "udp_sha256": "c0d3cb419f11812794ec0e9c7b33c1a661411e68c7499bdc696feb3bfb6212ff"
+  }
+]

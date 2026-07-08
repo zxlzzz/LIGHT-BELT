@@ -1,0 +1,117 @@
+schema_version: 1
+
+show:
+  id: "phase-17-acceptance-v1"
+  duration: 300.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "seam-chase"
+      start: 0.0
+      end: 90.0
+      priority: 10
+      target:
+        type: "virtual_path"
+        id: "screen_to_wall"
+      effect:
+        mode: "fixed"
+        name: "chase"
+        parameters:
+          speed: 30.0
+          width: 1
+          gap: 171
+          direction: "forward"
+          color_source: "rainbow"
+      transition:
+        fade_in: 0.0
+        fade_out: 0.0
+        blend: "replace"
+
+    - id: "concurrent-ceiling-analog"
+      start: 10.0
+      end: 70.0
+      priority: 20
+      target:
+        type: "analog_group"
+        ids: ["ceiling_left", "ceiling_right"]
+      effect:
+        mode: "fixed"
+        name: "breath"
+        parameters:
+          period: 6.0
+          color: [0.2, 0.7, 0.4]
+      transition:
+        fade_in: 2.0
+        fade_out: 2.0
+        blend: "replace"
+
+    - id: "concurrent-wall-wave"
+      start: 10.0
+      end: 70.0
+      priority: 30
+      target:
+        type: "digital_strip"
+        id: "wall_left"
+      effect:
+        mode: "fixed"
+        name: "color_wave"
+        parameters:
+          speed: 1.0
+          width: 0.5
+          hue_cycle_rate: 0.1
+      transition:
+        fade_in: 1.0
+        fade_out: 1.0
+        blend: "replace"
+
+    - id: "fade-proof-front"
+      start: 100.0
+      end: 110.0
+      priority: 10
+      target:
+        type: "digital_strip"
+        id: "front"
+      effect:
+        mode: "fixed"
+        name: "static"
+        parameters:
+          color: [0.8, 0.2, 0.1]
+      transition:
+        fade_in: 4.0
+        fade_out: 4.0
+        blend: "replace"
+
+    - id: "music-adaptive-all-digital"
+      start: 120.0
+      end: 300.0
+      priority: 10
+      target:
+        type: "all_digital"
+      effect:
+        mode: "adaptive"
+        allowed:
+          silence: "calm"
+          calm: "breath"
+          flowing: "color_wave"
+          ambient: "color_wave"
+          rhythmic: "chase"
+          energetic: "comet"
+          impact: "bass_pulse"
+          transition: "color_wave"
+        fallback: "color_wave"
+      audio_control:
+        tempo_sync: "auto"
+        tempo_confidence_min: 0.75
+        beat_regularity_min: 0.70
+        no_beat_fallback: "auto"
+        beats_per_cycle: 4.0
+        beat_subdivision: 1.0
+        speed_smoothing_seconds: 0.0
+        state_confirmation_seconds: 0.0
+        min_effect_hold: 0.0
+        switch_cooldown: 0.0
