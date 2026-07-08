@@ -58,6 +58,88 @@ def test_validate_config_accepts_default_config() -> None:
             999,
             "existing layout.digital_nodes node_id",
         ),
+        (
+            lambda data: data["layout"].setdefault("virtual_paths", []).append(
+                {
+                    "id": "bad_path",
+                    "segments": [
+                        {
+                            "strip_id": "missing",
+                            "source_start": 0,
+                            "pixel_count": 1,
+                            "direction": "forward",
+                        }
+                    ],
+                }
+            ),
+            "layout.virtual_paths[1].segments[0]",
+            "strip_id",
+            "missing",
+            "existing layout.strips id",
+        ),
+        (
+            lambda data: data["layout"].setdefault("virtual_paths", []).append(
+                {
+                    "id": "bad_path",
+                    "segments": [
+                        {
+                            "strip_id": data["layout"]["strips"][0]["id"],
+                            "source_start": 1,
+                            "pixel_count": data["layout"]["strips"][0]["pixel_count"],
+                            "direction": "forward",
+                        }
+                    ],
+                }
+            ),
+            "layout.virtual_paths[1].segments[0]",
+            "pixel_count",
+            144,
+            "source range",
+        ),
+        (
+            lambda data: data["layout"].setdefault("virtual_paths", []).append(
+                {
+                    "id": "bad_path",
+                    "segments": [
+                        {
+                            "strip_id": data["layout"]["strips"][0]["id"],
+                            "source_start": 0,
+                            "pixel_count": 1,
+                            "direction": "sideways",
+                        }
+                    ],
+                }
+            ),
+            "layout.virtual_paths[1].segments[0]",
+            "direction",
+            "sideways",
+            "one of",
+        ),
+        (
+            lambda data: data["layout"].setdefault("virtual_paths", []).append(
+                {
+                    "id": "bad_path",
+                    "segments": [
+                        {
+                            "strip_id": data["layout"]["strips"][0]["id"],
+                            "source_start": 0,
+                            "pixel_count": 1,
+                            "direction": "forward",
+                        },
+                        {
+                            "strip_id": data["layout"]["strips"][0]["id"],
+                            "source_start": 0,
+                            "pixel_count": 1,
+                            "direction": "reverse",
+                        },
+                    ],
+                }
+            ),
+            "layout.virtual_paths[1].segments[1]",
+            "source_start",
+            0,
+            "non-overlapping source pixels",
+        ),
     ],
 )
 def test_invalid_config_errors_include_diagnostic_fields(

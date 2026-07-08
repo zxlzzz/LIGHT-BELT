@@ -27,10 +27,27 @@
 ## Data Flow
 
 1. **Input**: Media files or SyntheticDataSource produce raw frames/samples
-2. **Analysis**: VideoAnalyzer and AudioAnalyzer extract features
-3. **Context**: EffectContext bundles features with timing and parameters
-4. **Effect**: Active effect processes context → PixelFrame
-5. **Output**: PixelFrame sent to all enabled output backends
+2. **Analysis**: VideoAnalyzer and AudioAnalyzer extract low-level features
+3. **Music control**: MusicControlAnalyzer derives bounded control state from
+   AudioFeatures history without selecting effects
+4. **Context**: EffectContext bundles features with timing and parameters
+5. **Effect**: Active effect processes context → PixelFrame
+6. **Output**: PixelFrame sent to all enabled output backends
+
+## Virtual Paths
+
+Virtual paths concatenate authored logical digital-strip subranges into one
+continuous integer coordinate space. A virtual-path effect renders one complete
+path-sized buffer in global coordinates, then the mapping layer splits that
+buffer into sparse strip-range contributions. Reversed segments reverse only
+the destination pixel order; they do not restart or reverse global animation
+phase.
+
+Authored `gap_after_pixels` values create unmapped virtual coordinates that
+advance animation phase and time while producing no physical destination
+contribution. Pixels outside selected partial-strip ranges remain absent/no
+contribution. ESP32 node assignment and UDP routing are handled later by
+physical mapping and do not affect virtual path coordinates.
 
 ## Thread Model
 

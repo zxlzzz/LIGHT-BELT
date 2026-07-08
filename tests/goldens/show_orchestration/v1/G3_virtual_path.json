@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "path_buffer": [
+    "R",
+    "G",
+    "B",
+    "Y",
+    "M"
+  ],
+  "segments": [
+    {
+      "strip_id": "strip_a",
+      "source_start": 0,
+      "pixel_count": 3,
+      "direction": "forward",
+      "gap_after_pixels": 0
+    },
+    {
+      "strip_id": "strip_b",
+      "source_start": 0,
+      "pixel_count": 2,
+      "direction": "reverse",
+      "gap_after_pixels": 0
+    }
+  ],
+  "expected": {
+    "strip_a": [
+      "R",
+      "G",
+      "B"
+    ],
+    "strip_b": [
+      "M",
+      "Y"
+    ]
+  },
+  "seam_frames": [
+    {
+      "global_head": 2,
+      "lit_count": 1,
+      "expected_target": "strip_a",
+      "expected_destination_index": 2
+    },
+    {
+      "global_head": 3,
+      "lit_count": 1,
+      "expected_target": "strip_b",
+      "expected_destination_index": 1
+    },
+    {
+      "global_head": 4,
+      "lit_count": 1,
+      "expected_target": "strip_b",
+      "expected_destination_index": 0
+    }
+  ],
+  "gap_case": {
+    "segments": [
+      {
+        "strip_id": "strip_a",
+        "pixel_count": 2,
+        "direction": "forward",
+        "gap_after_pixels": 2
+      },
+      {
+        "strip_id": "strip_b",
+        "pixel_count": 2,
+        "direction": "forward",
+        "gap_after_pixels": 0
+      }
+    ],
+    "total_virtual_length": 6,
+    "mapped_coordinates": [
+      0,
+      1,
+      4,
+      5
+    ],
+    "unmapped_gap_coordinates": [
+      2,
+      3
+    ]
+  }
+}

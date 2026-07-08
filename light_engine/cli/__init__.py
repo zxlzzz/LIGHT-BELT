@@ -13,7 +13,9 @@ from light_engine import __version__
 from light_engine.clock import FakeClock, MpvIPCClock, OfflineRenderClock
 from light_engine.config import Config
 from light_engine.engine import Engine
+from light_engine.mapping import Layout
 from light_engine.outputs import health_summary
+from light_engine.show import ShowValidationError, ShowRuntime, TargetCatalog, load_show
 
 
 def setup_logging(level: str = "INFO") -> None:
@@ -47,6 +49,18 @@ def _clock_from_args(args: argparse.Namespace, config: Config):
         clock.connect()
         return clock
     raise ValueError(f"Unknown clock mode: {mode}")
+
+
+def _load_show_for_config(show_path: str, config: Config):
+    layout = Layout.from_config(config)
+    catalog = TargetCatalog.from_layout(layout)
+    return load_show(Path(show_path), catalog), layout
+
+
+def _configure_engine_show(engine: Engine, show_path: str) -> float:
+    show, _layout = _load_show_for_config(show_path, engine._config)
+    engine.set_show_runtime(ShowRuntime.from_layout(show, engine._layout))
+    return show.duration
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
@@ -99,15 +113,26 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not args.video and not args.audio:
         engine.use_synthetic()
 
-    engine.set_effect(args.effect or "video_audio_fusion")
+    show_duration = None
+    if args.show:
+        try:
+            show_duration = _configure_engine_show(engine, args.show)
+        except (OSError, ShowValidationError, ValueError, KeyError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+    else:
+        engine.set_effect(args.effect or "video_audio_fusion")
     engine.init_outputs()
 
     print(f"Light Engine v{__version__} - Run Mode")
     print(f"  Video: {args.video or 'generated'}")
     print(f"  Audio: {args.audio or 'generated'}")
-    print(f"  Effect: {args.effect or 'video_audio_fusion'}")
+    if args.show:
+        print(f"  Show: {args.show}")
+    else:
+        print(f"  Effect: {args.effect or 'video_audio_fusion'}")
 
-    engine.run(duration=args.duration, max_frames=args.max_frames)
+    engine.run(duration=args.duration if args.duration is not None else show_duration, max_frames=args.max_frames)
 
     stats = engine.get_fps_stats()
     print(f"\nCompleted: {stats['frame_count']} frames")
@@ -203,11 +228,19 @@ def cmd_export(args: argparse.Namespace) -> int:
     if not args.video and not args.audio:
         engine.use_synthetic()
 
-    engine.set_effect(args.effect or "video_audio_fusion")
+    show_duration = None
+    if args.show:
+        try:
+            show_duration = _configure_engine_show(engine, args.show)
+        except (OSError, ShowValidationError, ValueError, KeyError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+    else:
+        engine.set_effect(args.effect or "video_audio_fusion")
     engine.init_outputs()
 
     print(f"Exporting to {args.output}...")
-    engine.run(duration=args.duration, max_frames=args.max_frames)
+    engine.run(duration=args.duration if args.duration is not None else show_duration, max_frames=args.max_frames)
     print(f"Exported {engine.frame_count} frames to {args.output}")
     _print_health_summary(engine._outputs)
 
@@ -285,16 +318,27 @@ def cmd_run_mpv(args: argparse.Namespace) -> int:
         return 1
 
     engine = Engine(config, clock=clock)
-    engine.set_effect(args.effect or "video_audio_fusion")
+    show_duration = None
+    if args.show:
+        try:
+            show_duration = _configure_engine_show(engine, args.show)
+        except (OSError, ShowValidationError, ValueError, KeyError) as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+    else:
+        engine.set_effect(args.effect or "video_audio_fusion")
     engine.init_outputs()
 
     print(f"Light Engine v{__version__} - mpv Clock Mode")
     print(f"  IPC: {socket_path}")
-    print(f"  Effect: {args.effect or 'video_audio_fusion'}")
+    if args.show:
+        print(f"  Show: {args.show}")
+    else:
+        print(f"  Effect: {args.effect or 'video_audio_fusion'}")
     print("  Clock: mpv")
 
     try:
-        engine.run(duration=args.duration, max_frames=args.max_frames)
+        engine.run(duration=args.duration if args.duration is not None else show_duration, max_frames=args.max_frames)
     finally:
         clock.close()
         if mpv_process is not None:
@@ -306,6 +350,18 @@ def cmd_run_mpv(args: argparse.Namespace) -> int:
     print(f"  Effective FPS: {stats['effective_fps']:.1f}")
     print(f"  Processing capacity: {stats['processing_capacity']:.1f} FPS")
     _print_health_summary(engine._outputs)
+    return 0
+
+
+def cmd_validate_show(args: argparse.Namespace) -> int:
+    config = Config.get_instance(Path(args.config) if args.config else None)
+    setup_logging(config.get("system.logging.level", "INFO"))
+    try:
+        show, _layout = _load_show_for_config(args.show, config)
+    except (OSError, ShowValidationError, ValueError, KeyError) as e:
+        print(f"Invalid show: {e}", file=sys.stderr)
+        return 1
+    print(f"Show valid: {show.id} ({len(show.cues)} cues, duration={show.duration:g}s)")
     return 0
 
 
@@ -333,6 +389,7 @@ def main() -> None:
     p_run.add_argument("--video", "-v", default=None, help="Path to video file")
     p_run.add_argument("--audio", "-a", default=None, help="Path to audio file")
     p_run.add_argument("--effect", "-e", default=None, help="Effect name")
+    p_run.add_argument("--show", default=None, help="Path to authored show YAML")
     p_run.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
     p_run.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
     p_run.add_argument("--clock", choices=["internal", "offline", "fake", "mpv"], default="internal")
@@ -353,6 +410,7 @@ def main() -> None:
     p_export.add_argument("--video", "-v", default=None, help="Path to video file")
     p_export.add_argument("--audio", "-a", default=None, help="Path to audio file")
     p_export.add_argument("--effect", "-e", default=None, help="Effect name")
+    p_export.add_argument("--show", default=None, help="Path to authored show YAML")
     p_export.add_argument("--output", "-o", default="output.jsonl", help="Output file path")
     p_export.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
     p_export.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
@@ -372,8 +430,12 @@ def main() -> None:
     p_run_mpv.add_argument("--mpv-binary", default="mpv", help="mpv executable")
     p_run_mpv.add_argument("--mpv-socket", default=None, help="mpv JSON IPC socket path")
     p_run_mpv.add_argument("--effect", "-e", default=None, help="Effect name")
+    p_run_mpv.add_argument("--show", default=None, help="Path to authored show YAML")
     p_run_mpv.add_argument("--duration", "-d", type=float, default=None, help="Duration in seconds")
     p_run_mpv.add_argument("--max-frames", "-n", type=int, default=None, help="Max output frames")
+
+    p_validate_show = subparsers.add_parser("validate-show", help="Validate authored show YAML")
+    p_validate_show.add_argument("--show", required=True, help="Path to authored show YAML")
 
     args = parser.parse_args()
 
@@ -389,6 +451,8 @@ def main() -> None:
         sys.exit(cmd_benchmark(args))
     elif args.command == "run-mpv":
         sys.exit(cmd_run_mpv(args))
+    elif args.command == "validate-show":
+        sys.exit(cmd_validate_show(args))
     elif args.command == "inspect-video":
         sys.exit(cmd_inspect_video(args))
     elif args.command == "inspect-audio":

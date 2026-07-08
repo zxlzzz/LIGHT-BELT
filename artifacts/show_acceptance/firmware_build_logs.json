@@ -1,0 +1,4 @@
+{
+  "esp32": "not run by show_acceptance.py; required full verification command records the result",
+  "stm32": "not run by show_acceptance.py; required full verification command records the result"
+}

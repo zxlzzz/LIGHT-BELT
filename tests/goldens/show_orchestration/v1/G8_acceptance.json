@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "duration_seconds": 300,
+  "fps": 30,
+  "authored_frame_count": 9000,
+  "timestamps": "n/30 for n=0..8999",
+  "runs": 2,
+  "digest_algorithm": "SHA-256",
+  "required_evidence": [
+    "seam_before_at_after",
+    "three_concurrent_targets",
+    "fade_boundaries_and_midpoints",
+    "music_fallback_timeline",
+    "logical_physical_protocol_sequence_equality",
+    "bounded_state",
+    "offline_capacity",
+    "real_time_soak_metrics",
+    "NOT HARDWARE VERIFIED"
+  ]
+}

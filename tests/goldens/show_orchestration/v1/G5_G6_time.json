@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "cue": {
+    "start": 10.0,
+    "end": 20.0,
+    "fade_in": 2.0,
+    "fade_out": 2.0
+  },
+  "active_cases": [
+    {
+      "t": 9.999,
+      "active": false
+    },
+    {
+      "t": 10.0,
+      "active": true
+    },
+    {
+      "t": 19.999,
+      "active": true
+    },
+    {
+      "t": 20.0,
+      "active": false
+    }
+  ],
+  "weight_cases": [
+    {
+      "t": 10.0,
+      "weight": 0.0
+    },
+    {
+      "t": 11.0,
+      "weight": 0.5
+    },
+    {
+      "t": 12.0,
+      "weight": 1.0
+    },
+    {
+      "t": 18.0,
+      "weight": 1.0
+    },
+    {
+      "t": 19.0,
+      "weight": 0.5
+    }
+  ],
+  "local_time": {
+    "cue_start": 120.0,
+    "show_time": 123.5,
+    "expected": 3.5
+  },
+  "offline_grid": {
+    "fps": 30,
+    "duration": 300,
+    "first_n": 0,
+    "last_n": 8999,
+    "frame_count": 9000
+  }
+}

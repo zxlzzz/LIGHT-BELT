@@ -18,6 +18,7 @@ from light_engine.mapping.resolve import (
     validate_direction,
     VALID_VIDEO_ZONES,
 )
+from light_engine.mapping.virtual import VirtualPath, build_virtual_paths
 
 logger = logging.getLogger(__name__)
 _MISSING = object()
@@ -79,6 +80,7 @@ class Layout:
     analog_nodes: list[AnalogNodeMapping] = field(default_factory=list)
     digital_nodes: list[DigitalNodeMapping] = field(default_factory=list)
     digital_segments: list[DigitalSegmentMapping] = field(default_factory=list)
+    virtual_paths: tuple[VirtualPath, ...] = ()
     video_zone_map: dict[str, list[str]] = field(default_factory=dict)
 
     @classmethod
@@ -137,6 +139,7 @@ class Layout:
         # Load video zone map
         layout.video_zone_map = config.get("layout.video_zone_map", {})
         layout._load_physical_mapping(config)
+        layout._load_virtual_paths(config)
         PhysicalMapping(layout)
 
         return layout
@@ -224,6 +227,15 @@ class Layout:
                 ))
                 offset += strip.pixel_count
 
+    def _load_virtual_paths(self, config: Config) -> None:
+        virtual_paths_data = config.get("layout.virtual_paths", [])
+        strip_lengths = {strip.id: strip.pixel_count for strip in self.strips}
+        self.virtual_paths = build_virtual_paths(
+            virtual_paths_data,
+            strip_lengths,
+            base_path="layout.virtual_paths",
+        )
+
     def get_zone_ids(self) -> list[str]:
         """Get all RGB+CCT zone IDs."""
         return [z.id for z in self.zones]
@@ -237,6 +249,17 @@ class Layout:
         for s in self.strips:
             if s.id == strip_id:
                 return s
+        return None
+
+    def get_virtual_path_ids(self) -> list[str]:
+        """Get all virtual path IDs."""
+        return [path.id for path in self.virtual_paths]
+
+    def get_virtual_path(self, path_id: str) -> Optional[VirtualPath]:
+        """Get a virtual path by ID."""
+        for path in self.virtual_paths:
+            if path.id == path_id:
+                return path
         return None
 
     def get_zone(self, zone_id: str) -> Optional[ZoneDef]:

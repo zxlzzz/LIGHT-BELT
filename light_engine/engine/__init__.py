@@ -30,6 +30,7 @@ from light_engine.outputs import (
 )
 from light_engine.outputs.transform import OutputTransform
 from light_engine.data.generators import SyntheticDataSource
+from light_engine.show.compositor import ShowRuntime, black_base_frame
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ class Engine:
         # Current effect
         self._effect: Optional[BaseEffect] = None
         self._effect_name: str = ""
+        self._show_runtime: Optional[ShowRuntime] = None
 
         # Outputs
         self._outputs: dict[str, LightOutput] = {}
@@ -138,9 +140,23 @@ class Engine:
         """Set the active lighting effect."""
         self._effect = create_effect(name)
         self._effect_name = name
+        self._show_runtime = None
         self._diagnostics["mode"] = name
         logger.info("Effect set to: %s", name)
         return self._effect
+
+    def set_show_runtime(self, runtime: ShowRuntime) -> None:
+        """Use an explicit show runtime instead of the single-effect path."""
+        self._show_runtime = runtime
+        self._effect = None
+        self._effect_name = runtime.show.id
+        self._diagnostics["mode"] = runtime.show.id
+
+    def reset(self) -> None:
+        """Explicitly reset stateful runtime components before replaying from start."""
+        self._handle_timeline_reset()
+        self._timestamp = 0.0
+        self._last_clock_time = self._clock.now()
 
     def init_outputs(self) -> None:
         """Initialize output backends from config."""
@@ -160,7 +176,7 @@ class Engine:
             duration: Maximum run duration in seconds.
             max_frames: Maximum number of output frames.
         """
-        if self._effect is None:
+        if self._effect is None and self._show_runtime is None:
             self.set_effect(self._config.get("effects.active", "demo"))
 
         if not self._outputs:
@@ -187,7 +203,11 @@ class Engine:
                 clock_delta = self._timestamp - self._last_clock_time
                 if dt <= 0.0:
                     dt = max(0.0, clock_delta)
-                seek_detected = clock_delta < -frame_period or dt > frame_period * 2
+                if clock_delta < -frame_period:
+                    raise RuntimeError(
+                        "engine clock moved backward; call reset/replay before rendering earlier show time"
+                    )
+                seek_detected = dt > frame_period * 2
                 paused = self._clock.paused or dt < frame_period * 0.1
                 if self._clock.ended:
                     break
@@ -256,7 +276,18 @@ class Engine:
                         "zone_defs": self._zone_defs,
                     },
                 )
-                frame = self._effect.process(ctx)
+                if self._show_runtime is None:
+                    if self._effect is None:
+                        raise RuntimeError("single-effect engine path has no active effect")
+                    frame = self._effect.process(ctx)
+                else:
+                    base = black_base_frame(
+                        timestamp=self._timestamp,
+                        sequence=self._sequence,
+                        analog_zones=self._layout.zones,
+                        digital_strips=self._layout.strips,
+                    )
+                    frame = self._show_runtime.render(ctx, base)
                 frame = self._output_transform.apply_to_frame(frame)
                 physical_frame = self._physical_mapping.map(frame)
 
@@ -298,6 +329,8 @@ class Engine:
             self._audio_analyzer.reset()
         if self._effect is not None:
             self._effect.reset()
+        if self._show_runtime is not None:
+            self._show_runtime.reset()
         self._latest_video = None
         self._latest_audio = None
 

@@ -1,9 +1,13 @@
 """Tests for lighting effects."""
 
 import pytest
+from light_engine.effects.comet import CometEffect
 from light_engine.effects import create_effect, list_effects, BaseEffect
 from light_engine.effects.base import _EFFECT_REGISTRY
+from light_engine.mapping import ZoneDef
 from light_engine.models import EffectContext, RGBCCTColor
+from light_engine.show import Cue, EffectSpec, TargetResolver, TargetSelector, TransitionSpec
+from light_engine.show.compositor import CueRenderJob
 
 
 def _assert_rgbcct_zones(frame):
@@ -176,3 +180,43 @@ class TestAllEffects:
             ctx = ctx2
         # Should have seen at least 2 different effects
         assert len(names) >= 2
+
+
+def test_two_comet_cues_with_same_effect_name_have_independent_state(monkeypatch):
+    hues = iter([15.0, 195.0])
+    monkeypatch.setattr("light_engine.effects.comet.random.uniform", lambda _a, _b: next(hues))
+    resolver = TargetResolver(
+        (),
+        (
+            ZoneDef(id="strip_a", pixel_count=8),
+            ZoneDef(id="strip_b", pixel_count=8),
+        ),
+    )
+    cue_a = Cue(
+        id="comet-a",
+        start=0.0,
+        end=10.0,
+        target=TargetSelector("digital_strip", id="strip_a"),
+        effect=EffectSpec(mode="fixed", name="comet"),
+        transition=TransitionSpec(blend="replace"),
+    )
+    cue_b = Cue(
+        id="comet-b",
+        start=0.0,
+        end=10.0,
+        target=TargetSelector("digital_strip", id="strip_b"),
+        effect=EffectSpec(mode="fixed", name="comet"),
+        transition=TransitionSpec(blend="replace"),
+    )
+    job_a = CueRenderJob(cue_a, 0, resolver, effect=CometEffect("comet"))
+    job_b = CueRenderJob(cue_b, 1, resolver, effect=CometEffect("comet"))
+    ctx = EffectContext(timestamp=1.0, delta_time=0.25, sequence=4)
+
+    contribution_a = job_a.render(ctx)
+    contribution_b = job_b.render(ctx)
+
+    assert job_a.effect is not job_b.effect
+    assert job_a.effect._positions == {"strip_a": pytest.approx(0.375)}
+    assert job_b.effect._positions == {"strip_b": pytest.approx(0.375)}
+    assert contribution_a.digital[0].strip_id == "strip_a"
+    assert contribution_b.digital[0].strip_id == "strip_b"

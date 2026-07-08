@@ -1,0 +1,11 @@
+{
+  "campaign_branch": "campaign/show-orchestration-v1",
+  "start_branch": "campaign/show-orchestration-v1-c-music",
+  "steps": [
+    {
+      "phase_id": "phase-17-show-acceptance",
+      "task": ".agent/tasks/phase-17-show-acceptance.md",
+      "max_repairs": 1
+    }
+  ]
+}

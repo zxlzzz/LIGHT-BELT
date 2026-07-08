@@ -163,6 +163,9 @@ def validate_config(data: dict[str, Any]) -> None:
     digital_segments = _require_list(
         layout.get("digital_segments"), "layout", "digital_segments"
     )
+    virtual_paths = _require_list(
+        layout.get("virtual_paths", []), "layout", "virtual_paths"
+    )
 
     zone_ids: set[str] = set()
     for idx, item in enumerate(zones):
@@ -275,6 +278,69 @@ def validate_config(data: dict[str, Any]) -> None:
                     f"non-overlapping segment pixels on node {node_id}",
                 )
             occupied[node_id].add(pixel)
+
+    virtual_path_ids: set[str] = set()
+    for path_idx, item in enumerate(virtual_paths):
+        path = f"layout.virtual_paths[{path_idx}]"
+        virtual_path = _require_mapping(item, path, "item")
+        path_id = _require_nonempty_str(virtual_path.get("id"), path, "id")
+        if path_id in virtual_path_ids:
+            raise ConfigError(path, "id", path_id, "unique virtual path id")
+        virtual_path_ids.add(path_id)
+        segments = _require_list(virtual_path.get("segments"), path, "segments")
+        if not segments:
+            raise ConfigError(path, "segments", segments, "non-empty list")
+        occupied_sources: dict[str, set[int]] = {}
+        for segment_idx, item in enumerate(segments):
+            segment_path = f"{path}.segments[{segment_idx}]"
+            segment = _require_mapping(item, segment_path, "item")
+            strip_id = _require_nonempty_str(
+                segment.get("strip_id"), segment_path, "strip_id"
+            )
+            if strip_id not in strip_lengths:
+                raise ConfigError(
+                    segment_path, "strip_id", strip_id, "existing layout.strips id"
+                )
+            source_start = _require_int(
+                segment.get("source_start", 0),
+                segment_path,
+                "source_start",
+                0,
+            )
+            pixel_count = _require_int(
+                segment.get("pixel_count"), segment_path, "pixel_count", 1
+            )
+            _validate_choice(
+                segment.get("direction"),
+                segment_path,
+                "direction",
+                ["forward", "reverse"],
+            )
+            _require_int(
+                segment.get("gap_after_pixels", 0),
+                segment_path,
+                "gap_after_pixels",
+                0,
+            )
+            source_end = source_start + pixel_count
+            if source_end > strip_lengths[strip_id]:
+                raise ConfigError(
+                    segment_path,
+                    "pixel_count",
+                    pixel_count,
+                    f"source range [{source_start}, {source_end}) within "
+                    f"logical strip {strip_id!r} length {strip_lengths[strip_id]}",
+                )
+            occupied = occupied_sources.setdefault(strip_id, set())
+            for source_pixel in range(source_start, source_end):
+                if source_pixel in occupied:
+                    raise ConfigError(
+                        segment_path,
+                        "source_start",
+                        source_start,
+                        "non-overlapping source pixels within virtual path",
+                    )
+                occupied.add(source_pixel)
 
 
 class Config:

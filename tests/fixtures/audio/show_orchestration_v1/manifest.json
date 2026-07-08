@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "sample_rate": 44100,
+  "channels": 1,
+  "duration_seconds": 10.0,
+  "generator": "deterministic Python synthesis; no external copyrighted audio",
+  "fixtures": [
+    {
+      "file": "piano_irregular.wav",
+      "sha256": "40433d909692b686c562415347d24dc691b3fafedaec010e854602af0766353d",
+      "size_bytes": 882044
+    },
+    {
+      "file": "rhythmic_120bpm.wav",
+      "sha256": "c6a9bc2cd41a39bca7cfc1ac67d08e39739dede8f707b6b7cf9ded6b291a1e97",
+      "size_bytes": 882044
+    },
+    {
+      "file": "silence.wav",
+      "sha256": "99a00cb13591a8b767015477036fd3496377f8596dfe6dc5240c75f16ef3c46c",
+      "size_bytes": 882044
+    },
+    {
+      "file": "string_crescendo.wav",
+      "sha256": "4ab354588517f62665d0a35623e1bc3cda69364df1f2892ae64992a4d5f495f2",
+      "size_bytes": 882044
+    },
+    {
+      "file": "sustained_bass_pad.wav",
+      "sha256": "84757e24f4386eecc575fe04993fb9b4fc56527f0ef74c0161b41bc2639a97d1",
+      "size_bytes": 882044
+    }
+  ]
+}

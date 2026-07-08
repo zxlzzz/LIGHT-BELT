@@ -123,6 +123,59 @@ class AudioFeatures:
         self.onset = _validate_float(self.onset, "onset")
 
 
+@dataclass(frozen=True)
+class MusicControlState:
+    """Deterministic bounded music-control state.
+
+    Tempo is reported for the supported 60-180 BPM range. Confidence,
+    beat phase, beat strength, beat regularity, energy, transient,
+    bass ambience/pulse, and spectral motion are finite values in [0,1].
+    Energy trend is finite in [-1,1], where positive values indicate rising
+    energy over the bounded medium window.
+    """
+
+    timestamp: float
+    tempo_bpm: float = 0.0
+    tempo_confidence: float = 0.0
+    beat_phase: float = 0.0
+    beat_strength: float = 0.0
+    beat_regularity: float = 0.0
+    energy: float = 0.0
+    energy_trend: float = 0.0
+    transient: float = 0.0
+    bass_ambient: float = 0.0
+    bass_pulse: float = 0.0
+    spectral_motion: float = 0.0
+
+    def __post_init__(self) -> None:
+        if math.isnan(self.timestamp) or math.isinf(self.timestamp):
+            raise ValueError(f"timestamp must be finite, got {self.timestamp}")
+        object.__setattr__(
+            self, "tempo_bpm", _validate_float(self.tempo_bpm, "tempo_bpm", 0.0, 240.0)
+        )
+        for field_name in (
+            "tempo_confidence",
+            "beat_phase",
+            "beat_strength",
+            "beat_regularity",
+            "energy",
+            "transient",
+            "bass_ambient",
+            "bass_pulse",
+            "spectral_motion",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _validate_float(getattr(self, field_name), field_name),
+            )
+        object.__setattr__(
+            self,
+            "energy_trend",
+            _validate_float(self.energy_trend, "energy_trend", -1.0, 1.0),
+        )
+
+
 @dataclass
 class EffectContext:
     """Context passed to each effect's process() method.
@@ -143,6 +196,7 @@ class EffectContext:
     sequence: int = 0
     video_features: Optional[VideoFeatures] = None
     audio_features: Optional[AudioFeatures] = None
+    music_control_state: Optional[MusicControlState] = None
     speed: float = 1.0
     intensity: float = 1.0
     mode_parameters: dict[str, Any] = field(default_factory=dict)

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "fixtures": {
+    "rhythmic_120bpm.wav": {
+      "expect": [
+        "tempo_near_120_after_warmup",
+        "tempo_confidence_higher_than_piano",
+        "beat_regularity_high"
+      ]
+    },
+    "piano_irregular.wav": {
+      "expect": [
+        "transients_present",
+        "tempo_confidence_lower_than_rhythmic",
+        "no_mandatory_beat_lock"
+      ]
+    },
+    "string_crescendo.wav": {
+      "expect": [
+        "late_energy_greater_than_early",
+        "positive_energy_trend",
+        "tempo_confidence_may_be_low"
+      ]
+    },
+    "sustained_bass_pad.wav": {
+      "expect": [
+        "bass_ambient_high_after_attack",
+        "bass_pulse_decays_after_attack",
+        "no_repeated_impact"
+      ]
+    },
+    "silence.wav": {
+      "expect": [
+        "energy_near_zero",
+        "safe_finite_outputs",
+        "free_run_or_silence_state"
+      ]
+    }
+  },
+  "selector_reason_codes": [
+    "BEAT_CONFIDENT",
+    "EVENT_FALLBACK",
+    "ENVELOPE_FALLBACK",
+    "FREE_RUN_FALLBACK",
+    "FIXED_CUE",
+    "HOLD_ACTIVE",
+    "COOLDOWN_ACTIVE",
+    "STATE_UNCONFIRMED"
+  ]
+}

@@ -1,0 +1,170 @@
+layout:
+  total_strips: 6
+
+  zones:
+    - id: "ceiling_left"
+      type: "rgbcct"
+      label: "Ceiling Left"
+      video_zone: "top"
+      direction: "forward"
+    - id: "ceiling_right"
+      type: "rgbcct"
+      label: "Ceiling Right"
+      video_zone: "top"
+      direction: "forward"
+    - id: "wall_left"
+      type: "rgbcct"
+      label: "Wall Left"
+      video_zone: "left"
+      direction: "forward"
+    - id: "wall_right"
+      type: "rgbcct"
+      label: "Wall Right"
+      video_zone: "right"
+      direction: "forward"
+    - id: "front"
+      type: "rgbcct"
+      label: "Front"
+      video_zone: "center"
+      direction: "forward"
+    - id: "rear"
+      type: "rgbcct"
+      label: "Rear"
+      video_zone: "center"
+      direction: "reverse"
+
+  analog_nodes:
+    - node_id: 1
+      zone_id: "ceiling_left"
+      video_zone: "top"
+      channel_order: "RGBWC"
+      fade_ms: 0
+    - node_id: 2
+      zone_id: "ceiling_right"
+      video_zone: "top"
+      channel_order: "RGBWC"
+      fade_ms: 0
+    - node_id: 3
+      zone_id: "wall_left"
+      video_zone: "left"
+      channel_order: "RGBWC"
+      fade_ms: 0
+    - node_id: 4
+      zone_id: "wall_right"
+      video_zone: "right"
+      channel_order: "RGBWC"
+      fade_ms: 0
+    - node_id: 5
+      zone_id: "front"
+      video_zone: "center"
+      channel_order: "RGBWC"
+      fade_ms: 0
+    - node_id: 6
+      zone_id: "rear"
+      video_zone: "center"
+      channel_order: "RGBWC"
+      fade_ms: 0
+
+  strips:
+    - id: "ceiling_left"
+      type: "digital"
+      pixel_count: 12
+      direction: "forward"
+      video_zone: "top"
+    - id: "ceiling_right"
+      type: "digital"
+      pixel_count: 12
+      direction: "forward"
+      video_zone: "top"
+    - id: "wall_left"
+      type: "digital"
+      pixel_count: 16
+      direction: "forward"
+      video_zone: "left"
+    - id: "wall_right"
+      type: "digital"
+      pixel_count: 100
+      direction: "forward"
+      video_zone: "right"
+    - id: "front"
+      type: "digital"
+      pixel_count: 72
+      direction: "forward"
+      video_zone: "center"
+    - id: "rear"
+      type: "digital"
+      pixel_count: 8
+      direction: "reverse"
+      video_zone: "center"
+
+  digital_nodes:
+    - node_id: 7
+      host: "127.0.0.1"
+      port: 19017
+      pixel_count: 220
+      max_udp_payload: 4096
+
+  digital_segments:
+    - segment_id: "ceiling_left_main"
+      strip_id: "ceiling_left"
+      node_id: 7
+      offset: 0
+      pixel_count: 12
+      direction: "forward"
+      video_zone: "top"
+    - segment_id: "ceiling_right_main"
+      strip_id: "ceiling_right"
+      node_id: 7
+      offset: 12
+      pixel_count: 12
+      direction: "forward"
+      video_zone: "top"
+    - segment_id: "wall_left_main"
+      strip_id: "wall_left"
+      node_id: 7
+      offset: 24
+      pixel_count: 16
+      direction: "forward"
+      video_zone: "left"
+    - segment_id: "wall_right_main"
+      strip_id: "wall_right"
+      node_id: 7
+      offset: 40
+      pixel_count: 100
+      direction: "forward"
+      video_zone: "right"
+    - segment_id: "front_main"
+      strip_id: "front"
+      node_id: 7
+      offset: 140
+      pixel_count: 72
+      direction: "forward"
+      video_zone: "center"
+    - segment_id: "rear_main"
+      strip_id: "rear"
+      node_id: 7
+      offset: 212
+      pixel_count: 8
+      direction: "reverse"
+      video_zone: "center"
+
+  virtual_paths:
+    - id: "screen_to_wall"
+      segments:
+        - strip_id: "front"
+          source_start: 0
+          pixel_count: 72
+          direction: "forward"
+          gap_after_pixels: 0
+        - strip_id: "wall_right"
+          source_start: 0
+          pixel_count: 100
+          direction: "reverse"
+          gap_after_pixels: 0
+
+  video_zone_map:
+    left: ["wall_left"]
+    right: ["wall_right"]
+    top: ["ceiling_left", "ceiling_right"]
+    bottom: []
+    center: ["front", "rear"]

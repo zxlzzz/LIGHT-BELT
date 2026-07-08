@@ -1,0 +1,84 @@
+{
+  "concurrent_frame": {
+    "frame_index": 360,
+    "targets": [
+      {
+        "effect_id": "seam-chase",
+        "pixel_16": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "target_id": "front"
+      },
+      {
+        "effect_id": "concurrent-wall-wave",
+        "pixel_0": [
+          0.0,
+          1.0,
+          0.25
+        ],
+        "target_id": "wall_left"
+      },
+      {
+        "channels": {
+          "b": 0.2,
+          "cool_white": 0.04,
+          "g": 0.35,
+          "r": 0.1,
+          "warm_white": 0.025
+        },
+        "effect_id": "concurrent-ceiling-analog",
+        "target_id": "ceiling_left"
+      }
+    ],
+    "timestamp": 12.0
+  },
+  "seam_frames": [
+    {
+      "destination_pixel": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "expected_destination": {
+        "pixel_index": 71,
+        "strip_id": "front"
+      },
+      "frame_index": 71,
+      "lit_pixel_count_on_path": 1,
+      "timestamp": 2.366666667,
+      "virtual_coordinate": 71
+    },
+    {
+      "destination_pixel": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "expected_destination": {
+        "pixel_index": 99,
+        "strip_id": "wall_right"
+      },
+      "frame_index": 72,
+      "lit_pixel_count_on_path": 1,
+      "timestamp": 2.4,
+      "virtual_coordinate": 72
+    },
+    {
+      "destination_pixel": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "expected_destination": {
+        "pixel_index": 98,
+        "strip_id": "wall_right"
+      },
+      "frame_index": 73,
+      "lit_pixel_count_on_path": 1,
+      "timestamp": 2.433333333,
+      "virtual_coordinate": 73
+    }
+  ]
+}

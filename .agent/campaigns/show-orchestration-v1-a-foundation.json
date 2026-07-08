@@ -1,0 +1,16 @@
+{
+  "campaign_branch": "campaign/show-orchestration-v1-a-foundation",
+  "start_branch": "campaign/show-orchestration-v1-base",
+  "steps": [
+    {
+      "phase_id": "phase-11-show-schema",
+      "task": ".agent/tasks/phase-11-show-schema.md",
+      "max_repairs": 2
+    },
+    {
+      "phase_id": "phase-12-virtual-paths",
+      "task": ".agent/tasks/phase-12-virtual-paths.md",
+      "max_repairs": 2
+    }
+  ]
+}

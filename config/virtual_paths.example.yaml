@@ -1,0 +1,18 @@
+# Merge this fragment under the `layout:` mapping in config/layout.yaml.
+# V1 uses pixel coordinates. `gap_after_pixels` inserts unmapped virtual
+# coordinates so a moving effect may traverse an authored physical gap.
+# Millimetre-based calibration remains out of scope.
+
+virtual_paths:
+  - id: "screen_to_wall"
+    segments:
+      - strip_id: "front"
+        source_start: 0
+        pixel_count: 72
+        direction: "forward"
+        gap_after_pixels: 0
+      - strip_id: "wall_right"
+        source_start: 0
+        pixel_count: 100
+        direction: "reverse"
+        gap_after_pixels: 0

@@ -1,0 +1,41 @@
+schema_version: 1
+
+show:
+  id: "minimal-show"
+  duration: 30.0
+  defaults:
+    fade_in: 1.0
+    fade_out: 1.0
+    blend: "replace"
+
+  cues:
+    - id: "screen-to-wall-chase"
+      start: 0.0
+      end: 15.0
+      priority: 10
+      target:
+        type: "virtual_path"
+        id: "screen_to_wall"
+      effect:
+        mode: "fixed"
+        name: "chase"
+        parameters:
+          speed: 8.0
+          width: 6
+          gap: 12
+      transition:
+        fade_in: 1.0
+        fade_out: 1.0
+
+    - id: "ceiling-breath"
+      start: 5.0
+      end: 30.0
+      priority: 5
+      target:
+        type: "analog_group"
+        ids: ["ceiling_left", "ceiling_right"]
+      effect:
+        mode: "fixed"
+        name: "breath"
+        parameters:
+          period: 5.0

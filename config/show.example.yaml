@@ -1,0 +1,74 @@
+schema_version: 1
+
+show:
+  id: "teacher-demo-v1"
+  duration: 300.0
+  defaults:
+    fade_in: 1.0
+    fade_out: 1.0
+    blend: "replace"
+    min_effect_hold: 8.0
+    switch_cooldown: 6.0
+
+  cues:
+    - id: "opening-screen-to-wall"
+      start: 0.0
+      end: 20.0
+      priority: 10
+      target:
+        type: "virtual_path"
+        id: "screen_to_wall"
+      effect:
+        mode: "fixed"
+        name: "chase"
+        parameters:
+          speed: 9.0
+          width: 6
+          gap: 12
+          color_source: "video"
+      transition:
+        fade_in: 2.0
+        fade_out: 2.0
+
+    - id: "independent-ceiling-analog"
+      start: 5.0
+      end: 30.0
+      priority: 5
+      target:
+        type: "analog_group"
+        ids: ["ceiling_left", "ceiling_right"]
+      effect:
+        mode: "fixed"
+        name: "breath"
+        parameters:
+          period: 5.0
+
+    - id: "music-adaptive-wall-digital"
+      start: 30.0
+      end: 90.0
+      priority: 10
+      target:
+        type: "digital_group"
+        ids: ["wall_left", "wall_right"]
+      effect:
+        mode: "adaptive"
+        allowed:
+          silence: "calm"
+          calm: "breath"
+          flowing: "color_wave"
+          ambient: "color_wave"
+          rhythmic: "chase"
+          energetic: "comet"
+          impact: "comet"
+          transition: "color_wave"
+        fallback: "color_wave"
+      audio_control:
+        tempo_sync: "auto"
+        tempo_confidence_min: 0.75
+        beat_regularity_min: 0.70
+        no_beat_fallback: "auto"
+        beats_per_cycle: 4.0
+        speed_smoothing_seconds: 2.0
+        state_confirmation_seconds: 1.5
+        min_effect_hold: 8.0
+        switch_cooldown: 6.0

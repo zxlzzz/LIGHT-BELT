@@ -130,6 +130,8 @@ def test_default_config_maps_six_analog_nodes_and_one_digital_node() -> None:
     assert [command.node_id for command in physical.analog_commands] == [1, 2, 3, 4, 5, 6]
     assert len(physical.digital_frames) == 1
     assert len(physical.digital_frames[0].pixels) == 632
+    assert layout.get_virtual_path_ids() == ["screen_to_wall"]
+    assert layout.get_virtual_path("screen_to_wall").total_length == 172
 
 
 def test_physical_mapping_places_forward_and_reverse_segments() -> None:

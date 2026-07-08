@@ -37,19 +37,21 @@ All configuration files are in `config/` and loaded as YAML.
 
 ## layout.yaml
 
-Defines physical lighting zones and digital strips.
+Defines logical analog zones, digital strips, physical node mapping, and
+authored virtual paths.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | layout.total_strips | int | 6 | Total number of strips |
-| layout.zones | list | 6 items | RGBW zone definitions |
+| layout.zones | list | 6 items | RGB+CCT zone definitions |
 | layout.strips | list | 6 items | Digital strip definitions |
+| layout.virtual_paths | list | [] | Continuous virtual digital-strip paths |
 
 Zone definition:
 | Field | Type | Description |
 |-------|------|-------------|
 | id | string | Unique zone identifier |
-| type | string | "rgbw" (analog) |
+| type | string | "rgbcct" (analog) |
 | label | string | Human-readable name |
 
 Strip definition:
@@ -60,6 +62,28 @@ Strip definition:
 | pixel_count | int | Number of pixels (>0) |
 | direction | string | "forward" or "reverse" |
 | video_zone | string | Mapped video region |
+
+Virtual path definition:
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Unique virtual path identifier used by show targets |
+| segments | list | Non-empty ordered list of path segments |
+
+Virtual path segment:
+| Field | Type | Description |
+|-------|------|-------------|
+| strip_id | string | Existing logical digital strip id |
+| source_start | int | First source pixel in the logical strip; defaults to 0 only when omitted |
+| pixel_count | int | Positive number of mapped pixels |
+| direction | string | "forward" or "reverse"; reverse changes destination order only |
+| gap_after_pixels | int | Optional authored unmapped pixel coordinates after this segment; defaults to 0 |
+
+Virtual path coordinates are continuous integers from `0` to
+`total_virtual_length - 1`. Segment intervals and gap intervals cover that
+range exactly. `gap_after_pixels` extends animation time/phase but produces no
+physical destination contribution. V1 supports authored pixel gaps only;
+millimetre calibration and unequal pixels-per-metre compensation are out of
+scope.
 
 ## effects.yaml
 

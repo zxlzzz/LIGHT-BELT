@@ -1,0 +1,16 @@
+{
+  "campaign_branch": "campaign/show-orchestration-v1-b-runtime",
+  "start_branch": "campaign/show-orchestration-v1-a-foundation",
+  "steps": [
+    {
+      "phase_id": "phase-13-target-compositor",
+      "task": ".agent/tasks/phase-13-target-compositor.md",
+      "max_repairs": 2
+    },
+    {
+      "phase_id": "phase-14-timeline-transitions",
+      "task": ".agent/tasks/phase-14-timeline-transitions.md",
+      "max_repairs": 2
+    }
+  ]
+}

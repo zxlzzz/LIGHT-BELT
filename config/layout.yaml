@@ -156,6 +156,23 @@ layout:
       direction: "reverse"
       video_zone: "center"
 
+  # Phase 12 virtual paths use continuous pixel coordinates. Authored
+  # gap_after_pixels inserts unmapped virtual coordinates; metric calibration
+  # is intentionally out of scope for V1.
+  virtual_paths:
+    - id: "screen_to_wall"
+      segments:
+        - strip_id: "front"
+          source_start: 0
+          pixel_count: 72
+          direction: "forward"
+          gap_after_pixels: 0
+        - strip_id: "wall_right"
+          source_start: 0
+          pixel_count: 100
+          direction: "reverse"
+          gap_after_pixels: 0
+
   # Video zone mapping: video regions to logical zones
   video_zone_map:
     left: ["wall_left"]

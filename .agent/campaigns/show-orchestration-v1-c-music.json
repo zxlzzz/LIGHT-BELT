@@ -1,0 +1,16 @@
+{
+  "campaign_branch": "campaign/show-orchestration-v1-c-music",
+  "start_branch": "campaign/show-orchestration-v1-b-runtime",
+  "steps": [
+    {
+      "phase_id": "phase-15-music-control",
+      "task": ".agent/tasks/phase-15-music-control.md",
+      "max_repairs": 3
+    },
+    {
+      "phase_id": "phase-16-adaptive-selector",
+      "task": ".agent/tasks/phase-16-adaptive-selector.md",
+      "max_repairs": 3
+    }
+  ]
+}

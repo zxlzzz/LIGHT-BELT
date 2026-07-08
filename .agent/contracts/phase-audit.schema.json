@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "show-orchestration-phase-audit-v1",
+  "title": "Show Orchestration Phase Audit Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "phase_id",
+    "base_sha",
+    "head_sha",
+    "changed_files",
+    "tests_added",
+    "tests_modified",
+    "skip_count_before",
+    "skip_count_after",
+    "xfail_count_before",
+    "xfail_count_after",
+    "golden_manifest_sha256",
+    "commands",
+    "traceability",
+    "blockers"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "phase_id": {"type": "string", "minLength": 1},
+    "base_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
+    "head_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,40}$"},
+    "changed_files": {"type": "array", "items": {"type": "string"}},
+    "tests_added": {"type": "array", "items": {"type": "string"}},
+    "tests_modified": {"type": "array", "items": {"type": "string"}},
+    "skip_count_before": {"type": "integer", "minimum": 0},
+    "skip_count_after": {"type": "integer", "minimum": 0},
+    "xfail_count_before": {"type": "integer", "minimum": 0},
+    "xfail_count_after": {"type": "integer", "minimum": 0},
+    "golden_manifest_sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command", "return_code"],
+        "properties": {
+          "command": {"type": "string"},
+          "return_code": {"type": "integer"},
+          "summary": {"type": "string"}
+        }
+      }
+    },
+    "traceability": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement", "implementation", "test", "evidence"],
+        "properties": {
+          "requirement": {"type": "string"},
+          "implementation": {"type": "string"},
+          "test": {"type": "string"},
+          "evidence": {"type": "string"}
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+        }
+      }
+    },
+    "blockers": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -6,6 +6,15 @@ from light_engine.config import Config
 import light_engine.engine as engine_module
 from light_engine.engine import Engine
 from light_engine.mapping.physical import PhysicalFrame
+from light_engine.models import RGBCCTColor
+from light_engine.show import (
+    Cue,
+    EffectSpec,
+    ShowDefinition,
+    ShowRuntime,
+    TargetSelector,
+    TransitionSpec,
+)
 from light_engine.outputs import NullOutput
 
 
@@ -89,6 +98,69 @@ class TestFrameSequence:
             and command.color.warm_white == 0.0
             and command.color.cool_white == 0.0
             for command in captured[1].analog_commands
+        )
+
+    def test_engine_show_runtime_composes_independent_targets(self, monkeypatch):
+        captured = []
+
+        def capture_send_all(_outputs, frame):
+            captured.append(frame)
+
+        monkeypatch.setattr(engine_module, "send_all", capture_send_all)
+        Config.reset()
+        config = Config()
+        engine = Engine(config)
+        show = ShowDefinition(
+            schema_version=1,
+            id="phase-13-smoke",
+            duration=5.0,
+            cues=(
+                Cue(
+                    id="front-chase",
+                    start=0.0,
+                    end=5.0,
+                    priority=1,
+                    target=TargetSelector("digital_strip", id="front"),
+                    effect=EffectSpec(mode="fixed", name="chase"),
+                    transition=TransitionSpec(blend="replace"),
+                ),
+                Cue(
+                    id="rear-comet",
+                    start=0.0,
+                    end=5.0,
+                    priority=1,
+                    target=TargetSelector("digital_strip", id="rear"),
+                    effect=EffectSpec(mode="fixed", name="comet"),
+                    transition=TransitionSpec(blend="replace"),
+                ),
+                Cue(
+                    id="wall-breath",
+                    start=0.0,
+                    end=5.0,
+                    priority=1,
+                    target=TargetSelector("analog_zone", id="wall_left"),
+                    effect=EffectSpec(mode="fixed", name="breath"),
+                    transition=TransitionSpec(blend="replace"),
+                ),
+            ),
+        )
+        engine.set_show_runtime(ShowRuntime.from_layout(show, engine._layout))
+        output = NullOutput()
+        output.open()
+        engine._outputs = {"null": output}
+
+        engine.run(max_frames=1)
+
+        first_frame = captured[0]
+        assert isinstance(first_frame, PhysicalFrame)
+        assert first_frame.sequence == 1
+        analog_by_zone = {command.zone_id: command.color for command in first_frame.analog_commands}
+        assert analog_by_zone["wall_left"] != RGBCCTColor()
+        assert analog_by_zone["ceiling_left"] == RGBCCTColor()
+        assert any(
+            pixel != (0.0, 0.0, 0.0)
+            for digital_frame in first_frame.digital_frames
+            for pixel in digital_frame.pixels
         )
 
     def test_shutdown_closes_outputs_when_safe_frame_send_fails(self, monkeypatch):

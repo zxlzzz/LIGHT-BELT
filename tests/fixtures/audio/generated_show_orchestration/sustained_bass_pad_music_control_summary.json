@@ -1,0 +1,33 @@
+{
+  "final_state": {
+    "bass_ambient": 0.9533542952848384,
+    "bass_pulse": 0.0,
+    "beat_phase": 0.0,
+    "beat_regularity": 0.0,
+    "beat_strength": 0.0,
+    "energy": 0.4788557065379233,
+    "energy_trend": -0.06834057432715007,
+    "spectral_motion": 0.0,
+    "tempo_bpm": 0.0,
+    "tempo_confidence": 0.0,
+    "timestamp": 9.983333333333409,
+    "transient": 0.0
+  },
+  "fixture": "sustained_bass_pad.wav",
+  "summary": {
+    "bass_ambient_max": 0.9997054559352905,
+    "bass_pulse_max": 1.0,
+    "beat_regularity_mean_after_warmup": 0.0,
+    "duration_seconds": 9.983333333333409,
+    "energy_max": 0.9977080969226576,
+    "energy_min": 0.24997422739433792,
+    "energy_trend_mean_after_warmup": -0.0008935439471390611,
+    "frames": 600,
+    "history_bound": 2488,
+    "history_size": 1217,
+    "spectral_motion_max": 1.0,
+    "tempo_bpm_median_after_warmup": 0.0,
+    "tempo_confidence_mean_after_warmup": 0.0,
+    "transient_max": 1.0
+  }
+}

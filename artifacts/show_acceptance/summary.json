@@ -1,0 +1,687 @@
+{
+  "artifact_sha256": {
+    "artifacts/show_acceptance/benchmark_soak_metrics.json": "12c973e287b14ecb908b246eb2d2481954a09139fe5093001da58fc117b773e9",
+    "artifacts/show_acceptance/command_log.json": "73d995e9626aec98fd273738db261d9dd677b6ad09c340a1a212424a8373c467",
+    "artifacts/show_acceptance/firmware_build_logs.json": "d90ae2fa29b770ba9a6b612e04763c1e9c4b6e6b03cdd5e66706e75187e2a5b1",
+    "artifacts/show_acceptance/golden_hashes.json": "f6fae77f6f4951f03a9c6332915519b374107884ff2264c457d1ea93bc5e99d2",
+    "artifacts/show_acceptance/memory_output.jsonl": "68b8fdde2474a7cf7be7d12b9d4aa3062482fe75b16c68e81a4b130853f3aa2b",
+    "artifacts/show_acceptance/music_decision_timeline.json": "356ad632cbd4922c808d73805e4abebf96d55f6aaa097542584ef7d0b896ae1a",
+    "artifacts/show_acceptance/protocol_sequence_trace.json": "1d9f383ffd5914d9568f0ad9fe090736d87394dfc3bd340af52d2023f65515c0",
+    "artifacts/show_acceptance/seam_concurrency_frames.json": "769e4a73abfe06817fdb1d0cc1785b9c4757f211d70dc3ea2256f398295980b1",
+    "artifacts/show_acceptance/two_run_digests.json": "7fb3bd8a32e87af3cae60024b6aa10b09f442bd705afea403a6e4f759324e207"
+  },
+  "digest_equal": true,
+  "duration_seconds": 300,
+  "evidence": {
+    "bass_pulse_trace": [
+      {
+        "bass_ambient": 0.78,
+        "bass_pulse": 0.9,
+        "frame_index": 6900,
+        "timestamp": 230.0
+      },
+      {
+        "bass_ambient": 0.78,
+        "bass_pulse": 0.545878,
+        "frame_index": 6930,
+        "timestamp": 231.0
+      },
+      {
+        "bass_ambient": 0.78,
+        "bass_pulse": 0.200817,
+        "frame_index": 6990,
+        "timestamp": 233.0
+      },
+      {
+        "bass_ambient": 0.78,
+        "bass_pulse": 0.006064,
+        "frame_index": 7200,
+        "timestamp": 240.0
+      }
+    ],
+    "bounded_state": {
+      "authored_frames_retained_in_memory": 0,
+      "retained_protocol_trace_frames": 14,
+      "runtime_jobs": 5,
+      "transport_pending_frames": 0
+    },
+    "concurrent_frame": {
+      "frame_index": 360,
+      "targets": [
+        {
+          "effect_id": "seam-chase",
+          "pixel_16": [
+            1.0,
+            0.0,
+            0.0
+          ],
+          "target_id": "front"
+        },
+        {
+          "effect_id": "concurrent-wall-wave",
+          "pixel_0": [
+            0.0,
+            1.0,
+            0.25
+          ],
+          "target_id": "wall_left"
+        },
+        {
+          "channels": {
+            "b": 0.2,
+            "cool_white": 0.04,
+            "g": 0.35,
+            "r": 0.1,
+            "warm_white": 0.025
+          },
+          "effect_id": "concurrent-ceiling-analog",
+          "target_id": "ceiling_left"
+        }
+      ],
+      "timestamp": 12.0
+    },
+    "fade_samples": [
+      {
+        "frame_index": 3000,
+        "front_pixel_0": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "timestamp": 100.0,
+        "weight": 0.0
+      },
+      {
+        "frame_index": 3060,
+        "front_pixel_0": [
+          0.4,
+          0.1,
+          0.05
+        ],
+        "timestamp": 102.0,
+        "weight": 0.5
+      },
+      {
+        "frame_index": 3120,
+        "front_pixel_0": [
+          0.8,
+          0.2,
+          0.1
+        ],
+        "timestamp": 104.0,
+        "weight": 1.0
+      },
+      {
+        "frame_index": 3240,
+        "front_pixel_0": [
+          0.4,
+          0.1,
+          0.05
+        ],
+        "timestamp": 108.0,
+        "weight": 0.5
+      },
+      {
+        "frame_index": 3300,
+        "front_pixel_0": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "timestamp": 110.0,
+        "weight": 0.0
+      }
+    ],
+    "frame_count": 9000,
+    "music_timeline": [
+      {
+        "music_state": "rhythmic",
+        "previous_effect": null,
+        "reason_code": "BEAT_CONFIDENT",
+        "selected_effect": "chase",
+        "show_time": 120.0,
+        "source_features": {
+          "bass_ambient": 0.0,
+          "bass_pulse": 0.0,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.9,
+          "beat_strength": 0.8,
+          "energy": 0.55,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.25,
+          "tempo_bpm": 120.0,
+          "tempo_confidence": 0.92,
+          "timestamp": 120.0,
+          "transient": 0.2
+        },
+        "speed": 2.0,
+        "sync_mode": "beat_sync"
+      },
+      {
+        "music_state": "rhythmic",
+        "previous_effect": "chase",
+        "reason_code": "BEAT_CONFIDENT",
+        "selected_effect": "chase",
+        "show_time": 140.0,
+        "source_features": {
+          "bass_ambient": 0.0,
+          "bass_pulse": 0.0,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.9,
+          "beat_strength": 0.8,
+          "energy": 0.55,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.25,
+          "tempo_bpm": 120.0,
+          "tempo_confidence": 0.92,
+          "timestamp": 140.0,
+          "transient": 0.2
+        },
+        "speed": 2.0,
+        "sync_mode": "beat_sync"
+      },
+      {
+        "music_state": "flowing",
+        "previous_effect": "chase",
+        "reason_code": "EVENT_FALLBACK",
+        "selected_effect": "color_wave",
+        "show_time": 160.0,
+        "source_features": {
+          "bass_ambient": 0.0,
+          "bass_pulse": 0.5,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.2,
+          "beat_strength": 0.2,
+          "energy": 0.42,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.16,
+          "tempo_bpm": 0.0,
+          "tempo_confidence": 0.2,
+          "timestamp": 160.0,
+          "transient": 0.72
+        },
+        "speed": 2.0,
+        "sync_mode": "event_sync"
+      },
+      {
+        "music_state": "flowing",
+        "previous_effect": "color_wave",
+        "reason_code": "ENVELOPE_FALLBACK",
+        "selected_effect": "color_wave",
+        "show_time": 200.0,
+        "source_features": {
+          "bass_ambient": 0.2,
+          "bass_pulse": 0.05,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.0,
+          "beat_strength": 0.0,
+          "energy": 0.46,
+          "energy_trend": 0.18,
+          "spectral_motion": 0.2,
+          "tempo_bpm": 0.0,
+          "tempo_confidence": 0.1,
+          "timestamp": 200.0,
+          "transient": 0.08
+        },
+        "speed": 1.19,
+        "sync_mode": "envelope_sync"
+      },
+      {
+        "music_state": "impact",
+        "previous_effect": "color_wave",
+        "reason_code": "EVENT_FALLBACK",
+        "selected_effect": "bass_pulse",
+        "show_time": 230.0,
+        "source_features": {
+          "bass_ambient": 0.78,
+          "bass_pulse": 0.9,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.0,
+          "beat_strength": 0.0,
+          "energy": 0.36,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.08,
+          "tempo_bpm": 0.0,
+          "tempo_confidence": 0.15,
+          "timestamp": 230.0,
+          "transient": 0.08
+        },
+        "speed": 1.19,
+        "sync_mode": "event_sync"
+      },
+      {
+        "music_state": "ambient",
+        "previous_effect": "color_wave",
+        "reason_code": "FREE_RUN_FALLBACK",
+        "selected_effect": "color_wave",
+        "show_time": 240.0,
+        "source_features": {
+          "bass_ambient": 0.78,
+          "bass_pulse": 0.006064,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.0,
+          "beat_strength": 0.0,
+          "energy": 0.36,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.08,
+          "tempo_bpm": 0.0,
+          "tempo_confidence": 0.15,
+          "timestamp": 240.0,
+          "transient": 0.08
+        },
+        "speed": 1.0,
+        "sync_mode": "free_run"
+      },
+      {
+        "music_state": "silence",
+        "previous_effect": "color_wave",
+        "reason_code": "FREE_RUN_FALLBACK",
+        "selected_effect": "calm",
+        "show_time": 270.0,
+        "source_features": {
+          "bass_ambient": 0.0,
+          "bass_pulse": 0.0,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.0,
+          "beat_strength": 0.0,
+          "energy": 0.01,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.0,
+          "tempo_bpm": 0.0,
+          "tempo_confidence": 0.0,
+          "timestamp": 270.0,
+          "transient": 0.01
+        },
+        "speed": 1.0,
+        "sync_mode": "free_run"
+      },
+      {
+        "music_state": "silence",
+        "previous_effect": "calm",
+        "reason_code": "FREE_RUN_FALLBACK",
+        "selected_effect": "calm",
+        "show_time": 299.966666667,
+        "source_features": {
+          "bass_ambient": 0.0,
+          "bass_pulse": 0.0,
+          "beat_phase": 0.0,
+          "beat_regularity": 0.0,
+          "beat_strength": 0.0,
+          "energy": 0.01,
+          "energy_trend": 0.0,
+          "spectral_motion": 0.0,
+          "tempo_bpm": 0.0,
+          "tempo_confidence": 0.0,
+          "timestamp": 299.966667,
+          "transient": 0.01
+        },
+        "speed": 1.0,
+        "sync_mode": "free_run"
+      }
+    ],
+    "protocol_sequence_trace": [
+      {
+        "frame_index": 0,
+        "logical_sequence": 0,
+        "physical_sequence": 0,
+        "rs485_sequences": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "rs485_sha256": "74bb1ae02c1bf1288030b794d46ee4e0ef4a0779be3b318e03f99265e55351f4",
+        "timestamp": 0.0,
+        "udp_sequences": [
+          0
+        ],
+        "udp_sha256": "d05c68f4b677762a66d69b54842ad5daa9f99399ef3d3e26b0f6af5db8be079c"
+      },
+      {
+        "frame_index": 71,
+        "logical_sequence": 71,
+        "physical_sequence": 71,
+        "rs485_sequences": [
+          71,
+          71,
+          71,
+          71,
+          71,
+          71
+        ],
+        "rs485_sha256": "dcbf5031e6cbbe05a3a1e73ce9915784648134c212b81c57564bc0362948acf3",
+        "timestamp": 2.366666667,
+        "udp_sequences": [
+          71
+        ],
+        "udp_sha256": "8cd4248c89e47f9680d4ae44d5375df0581d43d8530c5430d27366b2d24567be"
+      },
+      {
+        "frame_index": 72,
+        "logical_sequence": 72,
+        "physical_sequence": 72,
+        "rs485_sequences": [
+          72,
+          72,
+          72,
+          72,
+          72,
+          72
+        ],
+        "rs485_sha256": "bb1ef3d757bf4670c3fce24053a01fbefa2c8157b00b40e392bd1233b2dcfec1",
+        "timestamp": 2.4,
+        "udp_sequences": [
+          72
+        ],
+        "udp_sha256": "263db99e02864955279c232183213b9c1b6e8a8fd0053b9bc2faecfd161270b1"
+      },
+      {
+        "frame_index": 73,
+        "logical_sequence": 73,
+        "physical_sequence": 73,
+        "rs485_sequences": [
+          73,
+          73,
+          73,
+          73,
+          73,
+          73
+        ],
+        "rs485_sha256": "ec003fffdd009a5090773a524daa8f8560711d86307229e795a8c98da94062db",
+        "timestamp": 2.433333333,
+        "udp_sequences": [
+          73
+        ],
+        "udp_sha256": "dca6165f14d8c31f2191bfd5627579b6221a7a77886a02ff23ce2f4ed67eef5a"
+      },
+      {
+        "frame_index": 360,
+        "logical_sequence": 360,
+        "physical_sequence": 360,
+        "rs485_sequences": [
+          104,
+          104,
+          104,
+          104,
+          104,
+          104
+        ],
+        "rs485_sha256": "88612cb42463a0fac129c7f8ee0975a5f3137c67aeba1b6726ded05207762ef5",
+        "timestamp": 12.0,
+        "udp_sequences": [
+          360
+        ],
+        "udp_sha256": "525497a1049638ed545bb1c7a3c8b095079b018105a7b7650eb05060f2653e1a"
+      },
+      {
+        "frame_index": 3000,
+        "logical_sequence": 3000,
+        "physical_sequence": 3000,
+        "rs485_sequences": [
+          184,
+          184,
+          184,
+          184,
+          184,
+          184
+        ],
+        "rs485_sha256": "4fd34cf9c80a164484b9951ecb04bd456c3938b8c7e4102fa3569e6a021fde4e",
+        "timestamp": 100.0,
+        "udp_sequences": [
+          3000
+        ],
+        "udp_sha256": "b6e685bc0d86395919a5da515b3523b53946c2da125a17d118e90373db114dfc"
+      },
+      {
+        "frame_index": 3060,
+        "logical_sequence": 3060,
+        "physical_sequence": 3060,
+        "rs485_sequences": [
+          244,
+          244,
+          244,
+          244,
+          244,
+          244
+        ],
+        "rs485_sha256": "ca9549ed8cb4600bbea56e40cfbb60863a15e30aaf640f1e656bcc97b9c65928",
+        "timestamp": 102.0,
+        "udp_sequences": [
+          3060
+        ],
+        "udp_sha256": "9698fc87eb2013c1446596a1c6910cb5c127a7e53918d58a9f880f248d8c3c91"
+      },
+      {
+        "frame_index": 3120,
+        "logical_sequence": 3120,
+        "physical_sequence": 3120,
+        "rs485_sequences": [
+          48,
+          48,
+          48,
+          48,
+          48,
+          48
+        ],
+        "rs485_sha256": "c00614845806bae6b8c060d437c1e680bf916e38838d3fe4c19483b48ac6e768",
+        "timestamp": 104.0,
+        "udp_sequences": [
+          3120
+        ],
+        "udp_sha256": "55627693dcfcf33244b127fffb412798b39f7b3f7b37d78cc9bfe763f715bdd8"
+      },
+      {
+        "frame_index": 3240,
+        "logical_sequence": 3240,
+        "physical_sequence": 3240,
+        "rs485_sequences": [
+          168,
+          168,
+          168,
+          168,
+          168,
+          168
+        ],
+        "rs485_sha256": "0a9dc511eed2c4b34c10f35d97c90df4aa26c7cf278f6097675f906387916101",
+        "timestamp": 108.0,
+        "udp_sequences": [
+          3240
+        ],
+        "udp_sha256": "e6529a19428d6f69f812f9938f3a4bde83009ebfefa23ddc6bca24927ebffca5"
+      },
+      {
+        "frame_index": 3600,
+        "logical_sequence": 3600,
+        "physical_sequence": 3600,
+        "rs485_sequences": [
+          16,
+          16,
+          16,
+          16,
+          16,
+          16
+        ],
+        "rs485_sha256": "38755b953af5ed64bd2a533413cb371d8983bc886747c86d42eeb77f67e2bf45",
+        "timestamp": 120.0,
+        "udp_sequences": [
+          3600
+        ],
+        "udp_sha256": "ae51db1e349c9f237378e78aeb28528aaf04b21b23fbf60e6a7b730b1e4de517"
+      },
+      {
+        "frame_index": 4800,
+        "logical_sequence": 4800,
+        "physical_sequence": 4800,
+        "rs485_sequences": [
+          192,
+          192,
+          192,
+          192,
+          192,
+          192
+        ],
+        "rs485_sha256": "fd5d95b49f72a78e0e51fa982cad853da6f7898fbf8be2ab753ff0b9dce1671f",
+        "timestamp": 160.0,
+        "udp_sequences": [
+          4800
+        ],
+        "udp_sha256": "64d7aa63f0489810de86264d65b25cd5745b9b3a8a2426fc43f89e14cf01bbc7"
+      },
+      {
+        "frame_index": 6000,
+        "logical_sequence": 6000,
+        "physical_sequence": 6000,
+        "rs485_sequences": [
+          112,
+          112,
+          112,
+          112,
+          112,
+          112
+        ],
+        "rs485_sha256": "a5721f13f59d0b2cc38151457c46a012717321857da062ae5b97a66a405c27aa",
+        "timestamp": 200.0,
+        "udp_sequences": [
+          6000
+        ],
+        "udp_sha256": "d7d9cbaeb72f5c8bf08426148b973a0979b778ad2c5bc09b040a449499488f06"
+      },
+      {
+        "frame_index": 7200,
+        "logical_sequence": 7200,
+        "physical_sequence": 7200,
+        "rs485_sequences": [
+          32,
+          32,
+          32,
+          32,
+          32,
+          32
+        ],
+        "rs485_sha256": "7a1f5d3df20422cc94503d1881e1ab7e63c9ce0c29971480007e84e369d7caf9",
+        "timestamp": 240.0,
+        "udp_sequences": [
+          7200
+        ],
+        "udp_sha256": "93f720515c3be457d57546b3e831b253888d3e30805aa443036b37ddc0a412ab"
+      },
+      {
+        "frame_index": 8999,
+        "logical_sequence": 8999,
+        "physical_sequence": 8999,
+        "rs485_sequences": [
+          39,
+          39,
+          39,
+          39,
+          39,
+          39
+        ],
+        "rs485_sha256": "aad7f4764ce9497b22f4d73fb51a00155c7096aee8363228c11a7ccfa9c0aae2",
+        "timestamp": 299.966666667,
+        "udp_sequences": [
+          8999
+        ],
+        "udp_sha256": "c0d3cb419f11812794ec0e9c7b33c1a661411e68c7499bdc696feb3bfb6212ff"
+      }
+    ],
+    "seam_frames": [
+      {
+        "destination_pixel": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "expected_destination": {
+          "pixel_index": 71,
+          "strip_id": "front"
+        },
+        "frame_index": 71,
+        "lit_pixel_count_on_path": 1,
+        "timestamp": 2.366666667,
+        "virtual_coordinate": 71
+      },
+      {
+        "destination_pixel": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "expected_destination": {
+          "pixel_index": 99,
+          "strip_id": "wall_right"
+        },
+        "frame_index": 72,
+        "lit_pixel_count_on_path": 1,
+        "timestamp": 2.4,
+        "virtual_coordinate": 72
+      },
+      {
+        "destination_pixel": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "expected_destination": {
+          "pixel_index": 98,
+          "strip_id": "wall_right"
+        },
+        "frame_index": 73,
+        "lit_pixel_count_on_path": 1,
+        "timestamp": 2.433333333,
+        "virtual_coordinate": 73
+      }
+    ]
+  },
+  "fps": 30,
+  "frame_count": 9000,
+  "g8_acceptance": {
+    "authored_frame_count": 9000,
+    "digest_algorithm": "SHA-256",
+    "duration_seconds": 300,
+    "fps": 30,
+    "required_evidence": [
+      "seam_before_at_after",
+      "three_concurrent_targets",
+      "fade_boundaries_and_midpoints",
+      "music_fallback_timeline",
+      "logical_physical_protocol_sequence_equality",
+      "bounded_state",
+      "offline_capacity",
+      "real_time_soak_metrics",
+      "NOT HARDWARE VERIFIED"
+    ],
+    "runs": 2,
+    "schema_version": 1,
+    "timestamps": "n/30 for n=0..8999"
+  },
+  "g8_acceptance_sha256": "2e7a5a6b7abfb19a560e9b570624217be11583cfb470c4c135e2c8d4cc287765",
+  "golden_manifest_sha256": "71292e290fc63f9e09017751e09be27b31424b6b3a7d89b43764df9ae4066463",
+  "layout": "config\\layout_acceptance.yaml",
+  "not_hardware_verified": "NOT HARDWARE VERIFIED",
+  "offline_capacity_fps": 570.804,
+  "offline_elapsed_seconds": 15.767231,
+  "phase_id": "phase-17-show-acceptance",
+  "schema_version": 1,
+  "show": "config\\show_acceptance.yaml",
+  "soak_metrics": {
+    "actual_output_fps": 650.73,
+    "average_processing_ms": 1.532761,
+    "digest": "53cf300d290e86065177ccd7e325ec22797f1d98b389f6c908c315f01b9430f2",
+    "dropped_frames": 0,
+    "late_frames": 0,
+    "mode": "software simulator/memory/fake transport soak without hardware",
+    "p95_processing_ms": 1.532761,
+    "peak_queue_depth": 1,
+    "requested_duration_seconds": 300.0,
+    "rss_peak_kib": null,
+    "rss_start_kib": null,
+    "sequence_mismatches": 0
+  },
+  "two_run_digests": [
+    "53cf300d290e86065177ccd7e325ec22797f1d98b389f6c908c315f01b9430f2",
+    "53cf300d290e86065177ccd7e325ec22797f1d98b389f6c908c315f01b9430f2"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "campaign_branch": "campaign/show-orchestration-v1",
+  "start_branch": "campaign/show-orchestration-v1-base",
+  "steps": [
+    {
+      "phase_id": "phase-11-show-schema",
+      "task": ".agent/tasks/phase-11-show-schema.md",
+      "max_repairs": 2
+    },
+    {
+      "phase_id": "phase-12-virtual-paths",
+      "task": ".agent/tasks/phase-12-virtual-paths.md",
+      "max_repairs": 2
+    },
+    {
+      "phase_id": "phase-13-target-compositor",
+      "task": ".agent/tasks/phase-13-target-compositor.md",
+      "max_repairs": 2
+    },
+    {
+      "phase_id": "phase-14-timeline-transitions",
+      "task": ".agent/tasks/phase-14-timeline-transitions.md",
+      "max_repairs": 2
+    },
+    {
+      "phase_id": "phase-15-music-control",
+      "task": ".agent/tasks/phase-15-music-control.md",
+      "max_repairs": 3
+    },
+    {
+      "phase_id": "phase-16-adaptive-selector",
+      "task": ".agent/tasks/phase-16-adaptive-selector.md",
+      "max_repairs": 3
+    },
+    {
+      "phase_id": "phase-17-show-acceptance",
+      "task": ".agent/tasks/phase-17-show-acceptance.md",
+      "max_repairs": 1
+    }
+  ]
+}

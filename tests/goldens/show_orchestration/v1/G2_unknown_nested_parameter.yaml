@@ -1,0 +1,18 @@
+schema_version: 1
+show:
+  id: "invalid-nested"
+  duration: 10.0
+  cues:
+    - id: "bad-parameter"
+      start: 0.0
+      end: 5.0
+      target:
+        type: "digital_strip"
+        id: "front"
+      effect:
+        mode: "fixed"
+        name: "chase"
+        parameters:
+          sped: 3.0
+      transition:
+        fade_int: 1.0

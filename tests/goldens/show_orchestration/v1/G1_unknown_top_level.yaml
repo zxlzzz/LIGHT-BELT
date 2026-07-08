@@ -1,0 +1,6 @@
+schema_version: 1
+show:
+  id: "invalid-top-level"
+  duration: 10.0
+  unexpected_field: true
+  cues: []
