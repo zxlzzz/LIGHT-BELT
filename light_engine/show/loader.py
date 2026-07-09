@@ -253,9 +253,63 @@ def _parameters(value: Any, path: str, effect_name: str) -> dict[str, Any]:
     params = _mapping(value, path)
     allowed = get_effect_parameter_keys(effect_name)
     _unknown(params, allowed, path)
+    validated: dict[str, Any] = {}
     for key, item in params.items():
-        _parameter_value(item, f"{path}.{key}")
-    return dict(params)
+        item_path = f"{path}.{key}"
+        if key == "color_timeline":
+            validated[key] = _color_timeline(item, item_path)
+        else:
+            _parameter_value(item, item_path)
+            validated[key] = item
+    return validated
+
+
+def _color_timeline(value: Any, path: str) -> dict[str, Any]:
+    timeline = _mapping(value, path)
+    _unknown(timeline, {"interpolation", "keyframes"}, path)
+    interpolation = _choice(
+        timeline.get("interpolation"),
+        f"{path}.interpolation",
+        {"rgb_linear"},
+    )
+    keyframes_value = _list(timeline.get("keyframes"), f"{path}.keyframes")
+    if len(keyframes_value) < 2:
+        raise ShowValidationError(
+            f"{path}.keyframes",
+            keyframes_value,
+            "must contain at least 2 keyframes",
+        )
+    keyframes: list[dict[str, Any]] = []
+    previous_time: float | None = None
+    for index, raw_keyframe in enumerate(keyframes_value):
+        keyframe_path = f"{path}.keyframes[{index}]"
+        keyframe = _mapping(raw_keyframe, keyframe_path)
+        _unknown(keyframe, {"time", "color"}, keyframe_path)
+        time_value = _number(
+            keyframe.get("time"),
+            f"{keyframe_path}.time",
+            minimum=0.0,
+        )
+        if previous_time is not None and time_value <= previous_time:
+            raise ShowValidationError(
+                f"{keyframe_path}.time",
+                keyframe.get("time"),
+                f"must be > previous keyframe time {previous_time}",
+            )
+        color = _rgb_color(keyframe.get("color"), f"{keyframe_path}.color")
+        keyframes.append({"time": time_value, "color": color})
+        previous_time = time_value
+    return {"interpolation": interpolation, "keyframes": tuple(keyframes)}
+
+
+def _rgb_color(value: Any, path: str) -> tuple[float, float, float]:
+    channels = _list(value, path)
+    if len(channels) != 3:
+        raise ShowValidationError(path, value, "must contain exactly 3 RGB channels")
+    return tuple(
+        _number(channel, f"{path}[{index}]", minimum=0.0, maximum=1.0)
+        for index, channel in enumerate(channels)
+    )
 
 
 def _transition(value: Any, path: str) -> TransitionSpec:

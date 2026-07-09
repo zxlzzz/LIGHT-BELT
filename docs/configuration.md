@@ -101,18 +101,52 @@ parameter surface is:
 
 | Effect | Runtime-effective cue parameters |
 |--------|----------------------------------|
-| `static` | `color` |
-| `breath` | `period`, `min_brightness`, `color` |
+| `static` | `color`, `color_timeline` |
+| `breath` | `period`, `min_brightness`, `color`, `color_timeline` |
 | `color_wave` | `speed`, `width`, `hue_cycle_rate` |
 | `chase` | `speed`, `width`, `gap`, `direction`, `trail`, `color_source`, `beat_boost` |
 | `comet` | `speed`, `tail_length`, `decay` |
-| `audio_pulse` | `attack`, `release`, `color` |
-| `bass_pulse` | `attack`, `release`, `color` |
+| `audio_pulse` | `attack`, `release`, `color`, `color_timeline` |
+| `bass_pulse` | `attack`, `release`, `color`, `color_timeline` |
 | `spectrum` | `bass_zones`, `mid_zones`, `treble_zones` |
 | `video_ambient` | `smoothing` |
 | `video_audio_fusion` | `video_weight`, `audio_weight`, `bass_boost`, `treble_limit` |
-| `calm` | `period`, `color` |
+| `calm` | `period`, `color`, `color_timeline` |
 | `demo` | `cycle_interval`, `effects` |
+
+`color_timeline` is an authored show YAML field for smooth manual RGB changes
+inside one cue. It is supported only by `static`, `breath`, `audio_pulse`,
+`bass_pulse`, and `calm` in V1. When present, the timeline color at
+`show_time - cue.start` overrides `parameters.color`; `parameters.color`
+continues to override the effect's config/default color when no timeline is
+present. Video and rainbow color-source effects keep their existing policies.
+Chase and comet do not accept `color_timeline` in V1.
+
+Only `rgb_linear` interpolation is supported:
+
+```yaml
+effect:
+  mode: fixed
+  name: static
+  parameters:
+    color: [1.0, 1.0, 1.0]
+    color_timeline:
+      interpolation: rgb_linear
+      keyframes:
+        - time: 0.0
+          color: [1.0, 0.25, 0.05]
+        - time: 6.0
+          color: [1.0, 0.75, 0.20]
+        - time: 14.0
+          color: [0.20, 0.45, 1.0]
+```
+
+Keyframe times are finite cue-local seconds and must be strictly increasing.
+RGB channels are finite values in `[0.0, 1.0]`. Times before the first keyframe
+clamp to the first color; times after the last keyframe clamp to the last color.
+For a time between two keyframes, each channel is:
+
+`channel = start + (end - start) * ((cue_local_time - start_time) / (end_time - start_time))`
 
 ## outputs.yaml
 

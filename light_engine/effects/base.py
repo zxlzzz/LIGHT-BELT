@@ -33,21 +33,21 @@ class BaseEffect(ABC):
 _EFFECT_REGISTRY: dict[str, type[BaseEffect]] = {}
 
 _EFFECT_PARAMETER_KEYS: dict[str, frozenset[str]] = {
-    "static": frozenset({"color"}),
-    "breath": frozenset({"period", "min_brightness", "color"}),
+    "static": frozenset({"color", "color_timeline"}),
+    "breath": frozenset({"period", "min_brightness", "color", "color_timeline"}),
     "color_wave": frozenset({"speed", "width", "hue_cycle_rate"}),
     "chase": frozenset(
         {"speed", "width", "gap", "direction", "trail", "color_source", "beat_boost"}
     ),
     "comet": frozenset({"speed", "tail_length", "decay"}),
-    "audio_pulse": frozenset({"attack", "release", "color"}),
-    "bass_pulse": frozenset({"attack", "release", "color"}),
+    "audio_pulse": frozenset({"attack", "release", "color", "color_timeline"}),
+    "bass_pulse": frozenset({"attack", "release", "color", "color_timeline"}),
     "spectrum": frozenset({"bass_zones", "mid_zones", "treble_zones"}),
     "video_ambient": frozenset({"smoothing"}),
     "video_audio_fusion": frozenset(
         {"video_weight", "audio_weight", "bass_boost", "treble_limit"}
     ),
-    "calm": frozenset({"period", "color"}),
+    "calm": frozenset({"period", "color", "color_timeline"}),
     "demo": frozenset({"cycle_interval", "effects"}),
 }
 

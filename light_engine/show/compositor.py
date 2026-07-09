@@ -9,6 +9,7 @@ from hashlib import sha256
 from types import MappingProxyType
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from light_engine.color import evaluate_rgb_linear_timeline
 from light_engine.effects.base import BaseEffect, create_effect
 from light_engine.mapping import Layout, ZoneDef
 from light_engine.mapping.virtual import VirtualPath
@@ -398,6 +399,12 @@ class CueRenderJob:
                 "tempo_period": decision.tempo_period,
             }
         )
+        if "color_timeline" in scoped_params:
+            local_time = float(scoped_params["cue_local_time"])
+            scoped_params["color"] = evaluate_rgb_linear_timeline(
+                scoped_params["color_timeline"],
+                local_time,
+            )
         scoped = replace(
             scoped,
             speed=speed,

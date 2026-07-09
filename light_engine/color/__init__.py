@@ -5,7 +5,8 @@ from __future__ import annotations
 import colorsys
 import math
 from enum import Enum
-from typing import Tuple
+from collections.abc import Mapping, Sequence
+from typing import Any, Tuple
 
 import numpy as np
 
@@ -256,6 +257,49 @@ def lerp_color(
         c1[1] + (c2[1] - c1[1]) * t,
         c1[2] + (c2[2] - c1[2]) * t,
     )
+
+
+def evaluate_rgb_linear_timeline(
+    timeline: Mapping[str, Any],
+    cue_local_time: float,
+) -> Tuple[float, float, float]:
+    """Evaluate a validated authored ``color_timeline`` at cue-local time.
+
+    The V1 timeline format supports only RGB linear interpolation between
+    monotonically increasing keyframes. Times outside the authored range clamp
+    to the nearest endpoint.
+    """
+
+    if timeline.get("interpolation") != "rgb_linear":
+        raise ValueError("color_timeline.interpolation must be 'rgb_linear'")
+    keyframes = timeline.get("keyframes")
+    if not isinstance(keyframes, Sequence) or isinstance(keyframes, (str, bytes)):
+        raise TypeError("color_timeline.keyframes must be a sequence")
+    if len(keyframes) < 2:
+        raise ValueError("color_timeline.keyframes must contain at least two items")
+
+    if cue_local_time <= float(keyframes[0]["time"]):
+        return tuple(keyframes[0]["color"])  # type: ignore[return-value]
+    if cue_local_time >= float(keyframes[-1]["time"]):
+        return tuple(keyframes[-1]["color"])  # type: ignore[return-value]
+
+    for index in range(1, len(keyframes)):
+        previous = keyframes[index - 1]
+        current = keyframes[index]
+        start_time = float(previous["time"])
+        end_time = float(current["time"])
+        if cue_local_time <= end_time:
+            span = end_time - start_time
+            if span <= 0.0:
+                raise ValueError("color_timeline keyframe times must increase")
+            t = (cue_local_time - start_time) / span
+            return lerp_color(
+                tuple(previous["color"]),  # type: ignore[arg-type]
+                tuple(current["color"]),  # type: ignore[arg-type]
+                t,
+            )
+
+    return tuple(keyframes[-1]["color"])  # type: ignore[return-value]
 
 
 def hsv_lerp(
