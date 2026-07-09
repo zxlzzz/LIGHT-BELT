@@ -17,7 +17,7 @@ import random
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_float
 from light_engine.mapping.resolve import resolve_video_color
 from light_engine.models import (
     DigitalStrip,
@@ -47,6 +47,10 @@ class VideoAudioFusionEffect(BaseEffect):
         self._shimmer_phase: dict[str, float] = {}
 
     def process(self, ctx: EffectContext) -> PixelFrame:
+        video_weight = runtime_float(ctx, "video_weight", self._video_weight)
+        audio_weight = runtime_float(ctx, "audio_weight", self._audio_weight)
+        bass_boost = runtime_float(ctx, "bass_boost", self._bass_boost)
+        treble_limit = runtime_float(ctx, "treble_limit", self._treble_limit)
         vf = ctx.video_features
         af = ctx.audio_features
 
@@ -61,7 +65,7 @@ class VideoAudioFusionEffect(BaseEffect):
         # ---- Brightness: blend video + audio ----
         video_brightness = vf.brightness if vf else 0.5
         target_brightness = (
-            video_brightness * self._video_weight + audio_rms * self._audio_weight
+            video_brightness * video_weight + audio_rms * audio_weight
         )
         if silent:
             target_brightness = max(target_brightness, video_brightness * 0.3)
@@ -69,7 +73,7 @@ class VideoAudioFusionEffect(BaseEffect):
         bri = self._brightness_env.update(target_brightness, ctx.delta_time)
 
         # ---- Bass pulse ----
-        bass_pulse = self._bass_env.update(bass * self._bass_boost, ctx.delta_time)
+        bass_pulse = self._bass_env.update(bass * bass_boost, ctx.delta_time)
         if beat:
             bass_pulse = min(1.0, bass_pulse + 0.3)
 
@@ -78,7 +82,7 @@ class VideoAudioFusionEffect(BaseEffect):
         sr, sg, sb = self._color_sm.update(*avg_rgb)
 
         # ---- Treble shimmer cap ----
-        treble_shimmer = min(self._treble_limit, treble * 0.15)
+        treble_shimmer = min(treble_limit, treble * 0.15)
 
         # ============================================================
         # Digital strips: each strip uses its own video_zone color

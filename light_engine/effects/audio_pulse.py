@@ -2,7 +2,7 @@
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_float, runtime_rgb
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
@@ -27,13 +27,15 @@ class AudioPulseEffect(BaseEffect):
         self._env = AttackReleaseEnvelope(attack=attack, release=release)
 
     def process(self, ctx: EffectContext) -> PixelFrame:
+        self._env.attack = max(0.001, runtime_float(ctx, "attack", self._env.attack))
+        self._env.release = max(0.001, runtime_float(ctx, "release", self._env.release))
         target = 0.0
         if ctx.audio_features and not ctx.audio_features.silence:
             target = ctx.audio_features.rms * ctx.intensity
 
         bri = self._env.update(target, ctx.delta_time)
 
-        r, g, b = self._color
+        r, g, b = runtime_rgb(ctx, "color", self._color)
         r, g, b = r * bri, g * bri, b * bri
 
         strips = []

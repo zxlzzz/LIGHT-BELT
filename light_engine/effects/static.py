@@ -2,7 +2,7 @@
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_rgb
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
@@ -23,7 +23,7 @@ class StaticEffect(BaseEffect):
         )
 
     def process(self, ctx: EffectContext) -> PixelFrame:
-        r, g, b = self._color
+        r, g, b = runtime_rgb(ctx, "color", self._color)
 
         strips = []
         for strip_def in ctx.mode_parameters.get("strip_defs", []):

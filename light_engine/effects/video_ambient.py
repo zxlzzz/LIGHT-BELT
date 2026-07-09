@@ -2,7 +2,7 @@
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_float
 from light_engine.mapping.resolve import resolve_video_color
 from light_engine.models import (
     DigitalStrip,
@@ -27,12 +27,17 @@ class VideoAmbientEffect(BaseEffect):
         self._smoothers: dict[str, ColorSmoother] = {}
         self._alpha = smooth_alpha
 
-    def _get_smoother(self, key: str) -> ColorSmoother:
+    def _get_smoother(self, key: str, alpha: float) -> ColorSmoother:
         if key not in self._smoothers:
-            self._smoothers[key] = ColorSmoother(alpha=self._alpha)
-        return self._smoothers[key]
+            self._smoothers[key] = ColorSmoother(alpha=alpha)
+        smoother = self._smoothers[key]
+        smoother._r.alpha = alpha
+        smoother._g.alpha = alpha
+        smoother._b.alpha = alpha
+        return smoother
 
     def process(self, ctx: EffectContext) -> PixelFrame:
+        alpha = runtime_float(ctx, "smoothing", self._alpha)
         vf = ctx.video_features
 
         # --- Digital strips ---
@@ -44,7 +49,7 @@ class VideoAmbientEffect(BaseEffect):
             direction = sd.get("direction", "forward")
 
             base_rgb = resolve_video_color(video_zone, vf, sid)
-            sm = self._get_smoother(sid)
+            sm = self._get_smoother(sid, alpha)
             r, g, b = sm.update(*base_rgb)
 
             pixels = [(r, g, b)] * n
@@ -61,7 +66,7 @@ class VideoAmbientEffect(BaseEffect):
             video_zone = zd.get("video_zone", "center")
 
             base_rgb = resolve_video_color(video_zone, vf, zid)
-            sm = self._get_smoother(zid)
+            sm = self._get_smoother(zid, alpha)
             r, g, b = sm.update(*base_rgb)
 
             zones.append(ZoneOutput(

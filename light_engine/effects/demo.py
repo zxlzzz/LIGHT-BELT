@@ -1,7 +1,7 @@
 """DEMO effect - auto-cycles through multiple effects for demonstration."""
 
 from light_engine.config import Config
-from light_engine.effects.base import BaseEffect, create_effect
+from light_engine.effects.base import BaseEffect, create_effect, runtime_float, runtime_param
 from light_engine.models import EffectContext, PixelFrame
 
 
@@ -33,6 +33,17 @@ class DemoEffect(BaseEffect):
         if not self._effects:
             self._effects = [create_effect("static")]
 
+    def _apply_runtime_parameters(self, ctx: EffectContext) -> None:
+        self._cycle_interval = max(
+            0.001, runtime_float(ctx, "cycle_interval", self._cycle_interval)
+        )
+        effect_names = list(runtime_param(ctx, "effects", self._effect_names))
+        if effect_names != self._effect_names:
+            self._effect_names = effect_names
+            self._current_index = 0
+            self._elapsed = 0.0
+            self._init_effects()
+
     @property
     def current_effect_name(self) -> str:
         if self._effects:
@@ -40,6 +51,7 @@ class DemoEffect(BaseEffect):
         return "unknown"
 
     def process(self, ctx: EffectContext) -> PixelFrame:
+        self._apply_runtime_parameters(ctx)
         self._elapsed += ctx.delta_time
         if self._elapsed >= self._cycle_interval:
             self._elapsed = 0.0

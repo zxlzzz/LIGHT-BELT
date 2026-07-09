@@ -4,7 +4,7 @@ import colorsys
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_param
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
@@ -28,6 +28,9 @@ class SpectrumEffect(BaseEffect):
         self._treble_env = AttackReleaseEnvelope(attack=0.3, release=0.1)
 
     def process(self, ctx: EffectContext) -> PixelFrame:
+        bass_zones = set(runtime_param(ctx, "bass_zones", self._bass_zones))
+        mid_zones = set(runtime_param(ctx, "mid_zones", self._mid_zones))
+        treble_zones = set(runtime_param(ctx, "treble_zones", self._treble_zones))
         bass = 0.0
         mid = 0.0
         treble = 0.0
@@ -51,11 +54,11 @@ class SpectrumEffect(BaseEffect):
         for sd in ctx.mode_parameters.get("strip_defs", []):
             sid = sd["id"]
             n = sd["pixel_count"]
-            if sid in self._bass_zones:
+            if sid in bass_zones:
                 br, bri = band_colors["bass"], bass_bri
-            elif sid in self._mid_zones:
+            elif sid in mid_zones:
                 br, bri = band_colors["mid"], mid_bri
-            elif sid in self._treble_zones:
+            elif sid in treble_zones:
                 br, bri = band_colors["treble"], treble_bri
             else:
                 br, bri = (0.05, 0.05, 0.05), 0.0
@@ -65,13 +68,13 @@ class SpectrumEffect(BaseEffect):
         zones = []
         for zd in ctx.mode_parameters.get("zone_defs", []):
             zid = zd["id"]
-            if zid in self._bass_zones:
+            if zid in bass_zones:
                 cr, cg, cb = band_colors["bass"]
                 bri = bass_bri
-            elif zid in self._mid_zones:
+            elif zid in mid_zones:
                 cr, cg, cb = band_colors["mid"]
                 bri = mid_bri
-            elif zid in self._treble_zones:
+            elif zid in treble_zones:
                 cr, cg, cb = band_colors["treble"]
                 bri = treble_bri
             else:

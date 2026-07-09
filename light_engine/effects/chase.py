@@ -11,7 +11,13 @@ import math
 from typing import Optional
 
 from light_engine.config import Config
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import (
+    BaseEffect,
+    runtime_bool,
+    runtime_float,
+    runtime_int,
+    runtime_str,
+)
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
@@ -42,27 +48,39 @@ class ChaseEffect(BaseEffect):
         self._last_direction: int = 1
 
     def _chase_color(
-        self, pos: float, pixel_count: int, base_rgb: Optional[tuple[float, float, float]]
+        self,
+        pos: float,
+        pixel_count: int,
+        base_rgb: Optional[tuple[float, float, float]],
+        color_source: str,
     ) -> tuple[float, float, float]:
         """Get the color for a chase position."""
-        if self._color_source == "rainbow":
+        if color_source == "rainbow":
             hue = (pos / max(1, pixel_count) * 360 + self._hue_offset) % 360
             return colorsys.hsv_to_rgb(hue / 360, 1.0, 1.0)
-        elif self._color_source == "video" and base_rgb:
+        elif color_source == "video" and base_rgb:
             return base_rgb
         else:
             return (1.0, 0.6, 0.0)  # default orange
 
     def process(self, ctx: EffectContext) -> PixelFrame:
-        speed = self._speed_pps * ctx.speed
-        if ctx.mode_parameters.get("beat_boost") and ctx.audio_features:
+        speed_pps = runtime_float(ctx, "speed", self._speed_pps)
+        width = runtime_int(ctx, "width", self._width)
+        gap = runtime_int(ctx, "gap", self._gap)
+        direction = runtime_str(ctx, "direction", self._direction)
+        trail = runtime_float(ctx, "trail", self._trail)
+        color_source = runtime_str(ctx, "color_source", self._color_source)
+        beat_boost = runtime_float(ctx, "beat_boost", self._beat_boost)
+
+        speed = speed_pps * ctx.speed
+        if runtime_bool(ctx, "beat_boost", False) and ctx.audio_features:
             if ctx.audio_features.beat:
-                speed *= self._beat_boost
+                speed *= beat_boost
 
         # Direction
-        if self._direction == "bounce":
+        if direction == "bounce":
             dir_sign = self._last_direction
-        elif self._direction == "reverse":
+        elif direction == "reverse":
             dir_sign = -1
         else:
             dir_sign = 1
@@ -81,14 +99,14 @@ class ChaseEffect(BaseEffect):
             n = sd["pixel_count"]
             if n == 0:
                 continue
-            period = self._width + self._gap
+            period = width + gap
             if period <= 0:
                 period = 1
             pixels = []
             for i in range(n):
                 # Compute distance from nearest chase dot
                 pos = self._position
-                if self._direction == "bounce":
+                if direction == "bounce":
                     # For bounce, check both directions
                     dist_fwd = (i - pos) % period
                     dist_rev = (n - 1 - i - (n - 1 - pos)) % period
@@ -102,9 +120,9 @@ class ChaseEffect(BaseEffect):
                     else:
                         dist = (pos - (n - 1 - i)) % period
 
-                if dist <= self._width:
-                    intensity = 1.0 - (dist / self._width) * (1.0 - self._trail)
-                    r, g, b = self._chase_color(i, n, video_rgb)
+                if width > 0 and dist <= width:
+                    intensity = 1.0 - (dist / width) * (1.0 - trail)
+                    r, g, b = self._chase_color(i, n, video_rgb, color_source)
                     pixels.append((r * intensity, g * intensity, b * intensity))
                 else:
                     pixels.append((0.0, 0.0, 0.0))

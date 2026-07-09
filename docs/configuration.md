@@ -93,6 +93,27 @@ scope.
 
 Per-effect parameters documented in effects.yaml comments.
 
+Show cue parameters use the same effect parameter names as `effects.yaml`.
+At runtime, a key authored under `cue.effect.parameters` overrides the
+corresponding `effects.yaml` default for that cue render only. Omitted cue
+parameters keep the existing `effects.yaml` behavior. The V1 runtime-effective
+parameter surface is:
+
+| Effect | Runtime-effective cue parameters |
+|--------|----------------------------------|
+| `static` | `color` |
+| `breath` | `period`, `min_brightness`, `color` |
+| `color_wave` | `speed`, `width`, `hue_cycle_rate` |
+| `chase` | `speed`, `width`, `gap`, `direction`, `trail`, `color_source`, `beat_boost` |
+| `comet` | `speed`, `tail_length`, `decay` |
+| `audio_pulse` | `attack`, `release`, `color` |
+| `bass_pulse` | `attack`, `release`, `color` |
+| `spectrum` | `bass_zones`, `mid_zones`, `treble_zones` |
+| `video_ambient` | `smoothing` |
+| `video_audio_fusion` | `video_weight`, `audio_weight`, `bass_boost`, `treble_limit` |
+| `calm` | `period`, `color` |
+| `demo` | `cycle_interval`, `effects` |
+
 ## outputs.yaml
 
 | Key | Type | Default | Description |

@@ -5,7 +5,7 @@ import math
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_float
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
@@ -26,15 +26,19 @@ class ColorWaveEffect(BaseEffect):
         self._phase = 0.0
 
     def process(self, ctx: EffectContext) -> PixelFrame:
-        self._phase += ctx.delta_time * self._speed * ctx.speed
-        hue_base = (self._phase * self._hue_rate * 360) % 360
+        speed = runtime_float(ctx, "speed", self._speed)
+        width = max(0.001, runtime_float(ctx, "width", self._width))
+        hue_rate = runtime_float(ctx, "hue_cycle_rate", self._hue_rate)
+
+        self._phase += ctx.delta_time * speed * ctx.speed
+        hue_base = (self._phase * hue_rate * 360) % 360
 
         strips = []
         for sd in ctx.mode_parameters.get("strip_defs", []):
             n = sd["pixel_count"]
             pixels = []
             for i in range(n):
-                pos = (i / max(1, n)) / self._width + self._phase
+                pos = (i / max(1, n)) / width + self._phase
                 hue = (hue_base + pos * 120) % 360
                 r, g, b = colorsys.hsv_to_rgb(hue / 360, 1.0, 1.0)
                 pixels.append((r, g, b))

@@ -4,7 +4,7 @@ import math
 
 from light_engine.config import Config
 from light_engine.color import rgb_to_rgbcct
-from light_engine.effects.base import BaseEffect
+from light_engine.effects.base import BaseEffect, runtime_float, runtime_rgb
 from light_engine.models import (
     DigitalStrip,
     EffectContext,
@@ -24,15 +24,22 @@ class BreathEffect(BaseEffect):
         self._color: tuple[float, float, float] = (
             float(c[0]), float(c[1]), float(c[2])
         )
-        self._min = config.get("system.smoothing.min_brightness", 0.01)
+        self._min = config.get(
+            "effects.breath.min_brightness",
+            config.get("system.smoothing.min_brightness", 0.01),
+        )
         self._phase = 0.0
 
     def process(self, ctx: EffectContext) -> PixelFrame:
-        self._phase += ctx.delta_time
-        t = (math.sin(2 * math.pi * self._phase / self._period) + 1) / 2
-        brightness = self._min + (1.0 - self._min) * t
+        period = max(0.001, runtime_float(ctx, "period", self._period))
+        minimum = runtime_float(ctx, "min_brightness", self._min)
+        r, g, b = runtime_rgb(ctx, "color", self._color)
 
-        r, g, b = self._color
+        self._phase += ctx.delta_time
+        phase = float(ctx.mode_parameters.get("cue_local_time", self._phase))
+        t = (math.sin(2 * math.pi * phase / period) + 1) / 2
+        brightness = minimum + (1.0 - minimum) * t
+
         r, g, b = r * brightness, g * brightness, b * brightness
 
         strips = []

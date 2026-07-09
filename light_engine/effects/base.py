@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from light_engine.models import EffectContext, PixelFrame
 
@@ -76,3 +78,40 @@ def get_effect_parameter_keys(name: str) -> frozenset[str]:
             f"Unknown effect: {name}. Available: {list(_EFFECT_REGISTRY.keys())}"
         )
     return _EFFECT_PARAMETER_KEYS.get(name, frozenset())
+
+
+def runtime_param(ctx: EffectContext, key: str, default: Any) -> Any:
+    """Return a cue-authored runtime parameter, falling back to effect defaults."""
+
+    return ctx.mode_parameters.get(key, default)
+
+
+def runtime_float(ctx: EffectContext, key: str, default: float) -> float:
+    return float(runtime_param(ctx, key, default))
+
+
+def runtime_int(ctx: EffectContext, key: str, default: int) -> int:
+    return int(runtime_param(ctx, key, default))
+
+
+def runtime_str(ctx: EffectContext, key: str, default: str) -> str:
+    return str(runtime_param(ctx, key, default))
+
+
+def runtime_bool(ctx: EffectContext, key: str, default: bool) -> bool:
+    return bool(runtime_param(ctx, key, default))
+
+
+def runtime_rgb(
+    ctx: EffectContext,
+    key: str,
+    default: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    value = runtime_param(ctx, key, default)
+    if isinstance(value, Mapping):
+        return (float(value["r"]), float(value["g"]), float(value["b"]))
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        raise TypeError(f"{key} must be an RGB sequence or mapping")
+    if len(value) != 3:
+        raise ValueError(f"{key} must have exactly 3 RGB channels")
+    return (float(value[0]), float(value[1]), float(value[2]))
