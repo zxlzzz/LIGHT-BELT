@@ -74,6 +74,7 @@ All generated artifacts MUST remain software-only and MUST include `NOT HARDWARE
 
 ## Forbidden Files
 
+- artifacts/show_acceptance/**
 - light_engine/**
 - firmware/**
 - .agent/**
@@ -85,6 +86,10 @@ All generated artifacts MUST remain software-only and MUST include `NOT HARDWARE
 - tests/fixtures/audio/show_orchestration_v1/**
 - tests/goldens/show_orchestration/v1/**
 - docs/contracts/**
+
+## Artifact Scope Lock
+
+This phase MUST NOT modify `artifacts/show_acceptance/**`. Those files belong to the earlier Phase 17 acceptance baseline and are known to contain runtime/benchmark outputs. Do not update them to make this phase pass. If a command incidentally rewrites those files, treat that as a validation-command problem and avoid that command in this phase; do not commit the rewritten artifacts.
 
 
 ## Binding Quality Constraints
@@ -138,8 +143,10 @@ These constraints are part of acceptance, not suggestions:
 
 ## Required Full Verification
 
+The full verification intentionally excludes `tests/test_show_e2e_acceptance.py` because that legacy Phase 17 acceptance test rewrites `artifacts/show_acceptance/**`, which is outside this phase scope. Phase 22 adds a separate authoring-modulation acceptance path under `artifacts/authoring_modulation_acceptance/**`.
+
 ```powershell
-.\.python\Scripts\python.exe -m pytest -q
+.\.python\Scripts\python.exe -m pytest -q --ignore=tests/test_show_e2e_acceptance.py
 .\.python\Scripts\python.exe -m light_engine validate-show --show config/show_authoring_modulation_acceptance.yaml
 .\.python\Scripts\python.exe -m light_engine benchmark --effect video_audio_fusion --frames 1800
 git diff --check

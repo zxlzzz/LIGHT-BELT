@@ -88,6 +88,7 @@ It MUST NOT add new Host API enum values, physical IDs, REST endpoints, WebSocke
 
 ## Forbidden Files
 
+- artifacts/show_acceptance/**
 - light_engine/**
 - firmware/**
 - tests/**
@@ -96,6 +97,10 @@ It MUST NOT add new Host API enum values, physical IDs, REST endpoints, WebSocke
 - docs/contracts/**
 - certs/**
 - artifacts/**
+
+## Artifact Scope Lock
+
+This phase MUST NOT modify `artifacts/show_acceptance/**`. Those files belong to the earlier Phase 17 acceptance baseline and are known to contain runtime/benchmark outputs. Do not update them to make this phase pass. If a command incidentally rewrites those files, treat that as a validation-command problem and avoid that command in this phase; do not commit the rewritten artifacts.
 
 
 ## Binding Quality Constraints
@@ -145,8 +150,10 @@ At minimum, the implementer report MUST cite exact document sections proving:
 
 ## Required Full Verification
 
+The full verification intentionally excludes `tests/test_show_e2e_acceptance.py` because that legacy Phase 17 acceptance test rewrites `artifacts/show_acceptance/**`, which is outside this phase scope. Phase 22 adds a separate authoring-modulation acceptance path under `artifacts/authoring_modulation_acceptance/**`.
+
 ```powershell
-.\.python\Scripts\python.exe -m pytest -q
+.\.python\Scripts\python.exe -m pytest -q --ignore=tests/test_show_e2e_acceptance.py
 .\.python\Scripts\python.exe -m light_engine validate-show --show config/show.example.yaml
 git diff --check
 git status --short
