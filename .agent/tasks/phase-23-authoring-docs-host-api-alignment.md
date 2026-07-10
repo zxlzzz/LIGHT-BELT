@@ -1,4 +1,4 @@
-# Phase 23 — Authoring Documentation and Host API Alignment
+﻿# Phase 23 鈥?Authoring Documentation and Host API Alignment
 
 ## Phase ID
 
@@ -56,9 +56,9 @@ It MUST NOT add new Host API enum values, physical IDs, REST endpoints, WebSocke
   - virtual-path implementation and limitations;
   - PC-first debugging workflow and multi-computer restrictions.
 - Add a Host API alignment document explaining:
-  - `show.yaml effect.name` ↔ Host API `effect_type`;
-  - internal `cue.effect.parameters` ↔ Host API `params` / `effect_params`;
-  - internal `target.type: virtual_path`, `id: screen_to_wall` ↔ Host API `target_id: virtual_path.screen_to_wall`;
+  - `show.yaml effect.name` 鈫?Host API `effect_type`;
+  - internal `cue.effect.parameters` 鈫?Host API `params` / `effect_params`;
+  - internal `target.type: virtual_path`, `id: screen_to_wall` 鈫?Host API `target_id: virtual_path.screen_to_wall`;
   - `transition.fade_in/fade_out` seconds vs Host API `transition_ms` milliseconds;
   - `show.duration` seconds vs Host API `duration_ms`;
   - physical IDs are not APP-facing targets unless a future API explicitly exposes them.
@@ -153,7 +153,7 @@ At minimum, the implementer report MUST cite exact document sections proving:
 The full verification intentionally excludes `tests/test_show_e2e_acceptance.py` because that legacy Phase 17 acceptance test rewrites `artifacts/show_acceptance/**`, which is outside this phase scope. Phase 22 adds a separate authoring-modulation acceptance path under `artifacts/authoring_modulation_acceptance/**`.
 
 ```powershell
-.\.python\Scripts\python.exe -m pytest -q --ignore=tests/test_show_e2e_acceptance.py
+.\.python\Scripts\python.exe -m pytest -q --ignore=tests/test_show_e2e_acceptance.py --ignore=tests/test_authoring_modulation_acceptance.py
 .\.python\Scripts\python.exe -m light_engine validate-show --show config/show.example.yaml
 git diff --check
 git status --short
@@ -167,3 +167,14 @@ Report changed docs, section-by-section alignment summary, examples added/update
 ## Commit Message
 
 Phase 23: Document authoring features and Host API alignment
+
+## Phase 22 Artifact Lock
+
+This phase MUST NOT run validation commands that rewrite Phase 22 acceptance artifacts or reports.
+
+Do not run `tests/test_authoring_modulation_acceptance.py` in this phase. That test belongs to Phase 22 and rewrites:
+
+- artifacts/authoring_modulation_acceptance/**
+- docs/authoring_modulation_acceptance_report.md
+
+Phase 23 is documentation and Host API alignment only. It must not regenerate, update, normalize, or restamp Phase 22 acceptance evidence.
