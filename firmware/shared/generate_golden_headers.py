@@ -71,6 +71,7 @@ def _generate_project_header(
 def main() -> None:
     _generate(ROOT / "rs485_v2_golden.json", ROOT / "rs485_v2_golden.h", "RS485_V2_GOLDEN")
     _generate(ROOT / "udp_v2_golden.json", ROOT / "udp_v2_golden.h", "UDP_V2_GOLDEN")
+    _generate(ROOT / "udp_v3_golden.json", ROOT / "udp_v3_golden.h", "UDP_V3_GOLDEN")
     _generate_project_header(
         ROOT.parent / "stm32_rgbcct_node" / "test" / "golden_vectors.h",
         rs485_header="../../shared/rs485_v2_golden.h",

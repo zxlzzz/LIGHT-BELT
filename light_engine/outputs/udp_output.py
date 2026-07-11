@@ -7,6 +7,7 @@ from typing import Optional
 from light_engine.mapping.physical import PhysicalFrame
 from light_engine.outputs import LatestFrameQueue, LightOutput, OutputMode
 from light_engine.outputs.udp_v2 import FLAG_SAFE_STATE, UdpV2Packet
+from light_engine.outputs.udp_v3 import UdpV3Output, UdpV3Packet
 
 
 class UdpOutputV2(LightOutput):
@@ -123,6 +124,77 @@ class UdpOutputV2(LightOutput):
                 if self._socket is not None and not self._owns_socket
                 else self.mode.value,
                 "hardware_verified": False,
+            }
+        )
+        return caps
+
+
+class UdpOutputV3(UdpOutputV2):
+    """UDP v3 transport: one atomic multi-output datagram per ESP32 node.
+
+    ``DigitalNodeFrame.outputs`` is the only V3 input.  This class refuses a
+    legacy concatenated ``pixels``-only frame so independent hardware outputs
+    can never accidentally be treated as one continuous strip.
+    """
+
+    def flush_latest(self) -> None:
+        frame = self._queue.pop_latest()
+        if frame is None:
+            return
+        frame_ok = True
+        flags = FLAG_SAFE_STATE if frame.metadata.get("SAFE_STATE") is True else 0
+        media_timestamp_us = int(round(frame.timestamp * 1_000_000))
+        apply_at_us = frame.metadata.get("apply_at_us")
+        if apply_at_us is not None and type(apply_at_us) is not int:
+            raise ValueError("PhysicalFrame metadata apply_at_us must be an integer")
+        for digital_frame in frame.digital_frames:
+            try:
+                if not digital_frame.outputs:
+                    raise ValueError(
+                        f"UDP v3 node {digital_frame.node_id} has no independent outputs"
+                    )
+                packet = UdpV3Packet(
+                    digital_node_id=digital_frame.node_id,
+                    sequence=frame.sequence,
+                    media_timestamp_us=media_timestamp_us,
+                    apply_at_us=apply_at_us,
+                    flags=flags,
+                    outputs=tuple(
+                        UdpV3Output(
+                            output_id=output.output_id,
+                            gpio=output.gpio,
+                            pixels=tuple(
+                                (round(r * 255), round(g * 255), round(b * 255))
+                                for r, g, b in output.pixels
+                            ),
+                        )
+                        for output in digital_frame.outputs
+                    ),
+                ).encode()
+                self._send_datagram(packet, (digital_frame.host, digital_frame.port))
+                self._health.packets_sent += 1
+                self._health.mark_success()
+            except Exception as exc:
+                frame_ok = False
+                self._health.packets_dropped += 1
+                self._health.last_error = f"UDP v3 send error: {exc}"
+                if self.mode is OutputMode.PRODUCTION:
+                    self._health.healthy = False
+                    raise
+        if frame_ok:
+            self._health.logical_frames_sent += 1
+            self._health.mark_success()
+        else:
+            self._health.frames_dropped += 1
+
+    def capabilities(self) -> dict:
+        caps = super().capabilities()
+        caps.update(
+            {
+                "protocol": "UDP complete multi-output physical node frame v3",
+                "max_pixels": 300,
+                "hardware_verified": False,
+                "not_hardware_verified": True,
             }
         )
         return caps

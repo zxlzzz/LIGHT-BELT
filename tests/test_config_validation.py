@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +17,34 @@ def _default_data() -> dict:
 
 def test_validate_config_accepts_default_config() -> None:
     validate_config(_default_data())
+
+
+def _cabin_v3_data() -> dict:
+    return Config(Path("config/profiles/cabin_lighting_v3_production.yaml")).to_dict()
+
+
+@pytest.mark.parametrize(
+    ("mutate", "expected"),
+    [
+        (lambda data: data["layout"]["digital_outputs"].pop(), "every logical strip"),
+        (lambda data: data["layout"]["digital_outputs"][1].update({"output_id": 1}), "unique within node"),
+        (lambda data: data["layout"]["digital_outputs"][1].update({"gpio": 4}), "unique within node"),
+        (lambda data: data["layout"]["digital_nodes"][1].update({"pixel_count": 1}), "output pixel total 50"),
+        (lambda data: data["layout"]["digital_outputs"][0].update({"pixel_count": 11}), "exact logical strip"),
+        (
+            lambda data: (
+                data["layout"]["strips"][0].update({"pixel_count": 101}),
+                data["layout"]["digital_outputs"][0].update({"pixel_count": 101}),
+            ),
+            "<= 100",
+        ),
+    ],
+)
+def test_cabin_v3_mapping_rejects_incomplete_or_conflicting_outputs(mutate, expected) -> None:
+    data = deepcopy(_cabin_v3_data())
+    mutate(data)
+    with pytest.raises(ConfigError, match=expected):
+        validate_config(data)
 
 
 @pytest.mark.parametrize(

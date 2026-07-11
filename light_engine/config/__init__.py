@@ -216,6 +216,9 @@ def validate_config(data: dict[str, Any]) -> None:
     digital_segments = _require_list(
         layout.get("digital_segments"), "layout", "digital_segments"
     )
+    digital_outputs = _require_list(
+        layout.get("digital_outputs", []), "layout", "digital_outputs"
+    )
     virtual_paths = _require_list(
         layout.get("virtual_paths", []), "layout", "virtual_paths"
     )
@@ -260,8 +263,14 @@ def validate_config(data: dict[str, Any]) -> None:
             strip.get("pixel_count"), path, "pixel_count", 1
         )
 
-    if len(analog_nodes) != 6:
-        raise ConfigError("layout", "analog_nodes", len(analog_nodes), "exactly 6")
+    topology_version = layout.get("topology_version", 2)
+    if topology_version not in {2, 3}:
+        raise ConfigError("layout", "topology_version", topology_version, "2 or 3")
+    expected_analog_nodes = 1 if topology_version == 3 else 6
+    if len(analog_nodes) != expected_analog_nodes:
+        raise ConfigError(
+            "layout", "analog_nodes", len(analog_nodes), f"exactly {expected_analog_nodes}"
+        )
 
     used_node_ids: dict[int, str] = {}
     for idx, item in enumerate(analog_nodes):
@@ -278,6 +287,8 @@ def validate_config(data: dict[str, Any]) -> None:
         _require_nonempty_str(node.get("channel_order"), path, "channel_order")
 
     digital_node_lengths: dict[int, int] = {}
+    digital_node_versions: dict[int, int] = {}
+    digital_node_payload_limits: dict[int, int] = {}
     for idx, item in enumerate(digital_nodes):
         path = f"layout.digital_nodes[{idx}]"
         node = _require_mapping(item, path, "item")
@@ -288,10 +299,13 @@ def validate_config(data: dict[str, Any]) -> None:
         _require_nonempty_str(node.get("host"), path, "host")
         _require_int(node.get("port"), path, "port", 1)
         pixel_count = _require_int(node.get("pixel_count"), path, "pixel_count", 1)
+        protocol_version = node.get("protocol_version", 2)
+        if protocol_version not in {2, 3}:
+            raise ConfigError(path, "protocol_version", protocol_version, "2 or 3")
         max_udp_payload = _require_int(
             node.get("max_udp_payload"), path, "max_udp_payload", 1
         )
-        if pixel_count * 3 > max_udp_payload:
+        if protocol_version == 2 and pixel_count * 3 > max_udp_payload:
             raise ConfigError(
                 path,
                 "max_udp_payload",
@@ -299,6 +313,8 @@ def validate_config(data: dict[str, Any]) -> None:
                 f">= physical payload size {pixel_count * 3}",
             )
         digital_node_lengths[node_id] = pixel_count
+        digital_node_versions[node_id] = protocol_version
+        digital_node_payload_limits[node_id] = max_udp_payload
 
     occupied: dict[int, set[int]] = {
         node_id: set() for node_id in digital_node_lengths
@@ -351,6 +367,64 @@ def validate_config(data: dict[str, Any]) -> None:
                     f"non-overlapping segment pixels on node {node_id}",
                 )
             occupied[node_id].add(pixel)
+
+    if topology_version == 3:
+        if any(version != 3 for version in digital_node_versions.values()):
+            raise ConfigError("layout.digital_nodes", "protocol_version", 2, "UDP v3 for every cabin digital node")
+        if digital_segments:
+            raise ConfigError("layout", "digital_segments", digital_segments, "empty for UDP v3 topology")
+        if not digital_outputs:
+            raise ConfigError("layout", "digital_outputs", digital_outputs, "non-empty complete output mapping")
+        seen_strips: set[str] = set()
+        by_node: dict[int, list[dict[str, Any]]] = {}
+        for idx, item in enumerate(digital_outputs):
+            path = f"layout.digital_outputs[{idx}]"
+            output = _require_mapping(item, path, "item")
+            node_id = _require_int(output.get("node_id"), path, "node_id", 1)
+            output_id = _require_int(output.get("output_id"), path, "output_id", 1)
+            gpio = _require_int(output.get("gpio"), path, "gpio", 0)
+            strip_id = _require_nonempty_str(output.get("strip_id"), path, "strip_id")
+            pixel_count = _require_int(output.get("pixel_count"), path, "pixel_count", 1)
+            _validate_choice(output.get("direction", "forward"), path, "direction", ["forward", "reverse"])
+            if node_id not in digital_node_lengths:
+                raise ConfigError(path, "node_id", node_id, "existing layout.digital_nodes node_id")
+            if digital_node_versions[node_id] != 3:
+                raise ConfigError(path, "node_id", node_id, "UDP v3 digital node")
+            if strip_id not in strip_lengths:
+                raise ConfigError(path, "strip_id", strip_id, "existing layout.strips id")
+            if pixel_count != strip_lengths[strip_id]:
+                raise ConfigError(path, "pixel_count", pixel_count, f"exact logical strip {strip_id!r} length {strip_lengths[strip_id]}")
+            if pixel_count > 100:
+                raise ConfigError(path, "pixel_count", pixel_count, "<= 100 per physical output")
+            if strip_id in seen_strips:
+                raise ConfigError(path, "strip_id", strip_id, "unique complete strip mapping")
+            seen_strips.add(strip_id)
+            by_node.setdefault(node_id, []).append({"output_id": output_id, "gpio": gpio, "pixel_count": pixel_count})
+        if seen_strips != set(strip_lengths):
+            raise ConfigError("layout", "digital_outputs", sorted(set(strip_lengths) - seen_strips), "every logical strip mapped exactly once")
+        for node_id, outputs_for_node in by_node.items():
+            if len(outputs_for_node) > 3:
+                raise ConfigError("layout.digital_outputs", "node_id", node_id, "at most 3 independent outputs")
+            output_ids = [item["output_id"] for item in outputs_for_node]
+            gpios = [item["gpio"] for item in outputs_for_node]
+            if len(output_ids) != len(set(output_ids)):
+                raise ConfigError("layout.digital_outputs", "output_id", node_id, "unique within node")
+            if len(gpios) != len(set(gpios)):
+                raise ConfigError("layout.digital_outputs", "gpio", node_id, "unique within node")
+            mapped_pixel_count = sum(item["pixel_count"] for item in outputs_for_node)
+            if mapped_pixel_count != digital_node_lengths[node_id]:
+                raise ConfigError(
+                    "layout.digital_outputs",
+                    "node_id",
+                    node_id,
+                    f"output pixel total {mapped_pixel_count} matching digital node pixel_count",
+                )
+            encoded_size = 29 + sum(6 + item["pixel_count"] * 3 for item in outputs_for_node) + 4
+            if encoded_size > digital_node_payload_limits[node_id]:
+                raise ConfigError("layout.digital_outputs", "node_id", node_id, "one complete UDP v3 datagram within max_udp_payload")
+        for node_id, protocol_version in digital_node_versions.items():
+            if protocol_version == 3 and node_id not in by_node:
+                raise ConfigError("layout.digital_outputs", "node_id", node_id, "at least one output for each UDP v3 node")
 
     virtual_path_ids: set[str] = set()
     for path_idx, item in enumerate(virtual_paths):

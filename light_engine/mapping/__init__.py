@@ -10,6 +10,7 @@ from light_engine.config import Config, ConfigError
 from light_engine.mapping.physical import (
     AnalogNodeMapping,
     DigitalNodeMapping,
+    DigitalOutputMapping,
     DigitalSegmentMapping,
     PhysicalMapping,
 )
@@ -55,6 +56,15 @@ def _optional_str(
     return value
 
 
+def _optional_int(
+    item: dict[str, Any], field_name: str, path: str, default: int, min_value: int
+) -> int:
+    value = item.get(field_name, default)
+    if type(value) is not int or value < min_value:
+        raise ConfigError(path, field_name, value, f"integer >= {min_value}")
+    return value
+
+
 @dataclass
 class ZoneDef:
     """Definition of a lighting zone."""
@@ -80,6 +90,8 @@ class Layout:
     analog_nodes: list[AnalogNodeMapping] = field(default_factory=list)
     digital_nodes: list[DigitalNodeMapping] = field(default_factory=list)
     digital_segments: list[DigitalSegmentMapping] = field(default_factory=list)
+    digital_outputs: list[DigitalOutputMapping] = field(default_factory=list)
+    topology_version: int = 2
     virtual_paths: tuple[VirtualPath, ...] = ()
     video_zone_map: dict[str, list[str]] = field(default_factory=dict)
 
@@ -89,6 +101,7 @@ class Layout:
         if config is None:
             config = Config.get_instance()
         layout = cls()
+        layout.topology_version = config.get("layout.topology_version", 2)
 
         # Load digital strips
         strips_data = config.get("layout.strips", [])
@@ -158,7 +171,7 @@ class Layout:
                     ),
                     fade_ms=_require_int(item, "fade_ms", path, 0),
                 ))
-        else:
+        elif self.topology_version != 3:
             for idx, zone in enumerate(self.zones, start=1):
                 self.analog_nodes.append(AnalogNodeMapping(
                     node_id=idx,
@@ -177,6 +190,9 @@ class Layout:
                     pixel_count=_require_int(item, "pixel_count", path, 1),
                     max_udp_payload=_require_int(
                         item, "max_udp_payload", path, 1
+                    ),
+                    protocol_version=_optional_int(
+                        item, "protocol_version", path, 2, 2
                     ),
                 ))
         elif self.strips:
@@ -212,7 +228,7 @@ class Layout:
                     direction=_optional_str(item, "direction", path, "forward"),
                     video_zone=_optional_str(item, "video_zone", path, "center"),
                 ))
-        else:
+        elif self.topology_version != 3:
             offset = 0
             node_id = self.digital_nodes[0].node_id if self.digital_nodes else 1
             for strip in self.strips:
@@ -226,6 +242,18 @@ class Layout:
                     video_zone=strip.video_zone,
                 ))
                 offset += strip.pixel_count
+
+        output_data = config.get("layout.digital_outputs", [])
+        for idx, item in enumerate(output_data):
+            path = f"layout.digital_outputs[{idx}]"
+            self.digital_outputs.append(DigitalOutputMapping(
+                node_id=_require_int(item, "node_id", path, 1),
+                output_id=_require_int(item, "output_id", path, 1),
+                gpio=_require_int(item, "gpio", path, 0),
+                strip_id=_require_str(item, "strip_id", path),
+                pixel_count=_require_int(item, "pixel_count", path, 1),
+                direction=_optional_str(item, "direction", path, "forward"),
+            ))
 
     def _load_virtual_paths(self, config: Config) -> None:
         virtual_paths_data = config.get("layout.virtual_paths", [])
