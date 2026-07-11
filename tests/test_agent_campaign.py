@@ -67,6 +67,7 @@ def test_cabin_campaign_full_verification_excludes_legacy_artifact_writers() -> 
     )
 
     for step in steps:
+        assert step.max_repairs == 0
         text = (ROOT / step.task).read_text(encoding="utf-8-sig")
         commands = agent_pipeline.command_items(
             agent_pipeline.section_lines(text, "Required Full Verification")
