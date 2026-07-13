@@ -35,11 +35,26 @@ from light_engine.show.compositor import ShowRuntime, black_base_frame
 
 logger = logging.getLogger(__name__)
 
+_SEQUENCE_MODULUS = 1 << 32
+
+
+def _initial_sequence(config: Config) -> int:
+    """Choose a restart-safe seed for live hardware without affecting offline determinism."""
+    if config.get("outputs.mode", "memory") != "production":
+        return 0
+    return (time.time_ns() // 1_000_000) % _SEQUENCE_MODULUS
+
 
 class Engine:
     """Main lighting engine orchestrating analysis, effects, and output."""
 
-    def __init__(self, config: Optional[Config] = None, clock: Optional[Clock] = None):
+    def __init__(
+        self,
+        config: Optional[Config] = None,
+        clock: Optional[Clock] = None,
+        *,
+        sequence_seed: Optional[int] = None,
+    ):
         if config is None:
             config = Config.get_instance()
         self._config = config
@@ -87,7 +102,11 @@ class Engine:
         self._timestamp: float = 0.0
         self._last_clock_time: float = self._clock.now()
         self._frame_count: int = 0
-        self._sequence: int = 0
+        if sequence_seed is None:
+            sequence_seed = _initial_sequence(config)
+        if not isinstance(sequence_seed, int) or not 0 <= sequence_seed < _SEQUENCE_MODULUS:
+            raise ValueError("sequence_seed must be a uint32")
+        self._sequence: int = sequence_seed
         self._fps_stats: list[float] = []
         self._run_start_wall: float = 0.0
         self._run_end_wall: float = 0.0
@@ -274,7 +293,7 @@ class Engine:
                     last_audio_time = self._timestamp
 
                 # Build context and run effect
-                self._sequence += 1
+                self._advance_sequence()
                 context_dt = dt if dt > 0.0 else 1e-9
                 ctx = EffectContext(
                     timestamp=self._timestamp,
@@ -348,6 +367,11 @@ class Engine:
         self._latest_audio = None
         self._latest_music_control_state = None
 
+    def _advance_sequence(self) -> int:
+        """Advance the Engine-owned logical sequence with protocol uint32 wrap."""
+        self._sequence = (self._sequence + 1) % _SEQUENCE_MODULUS
+        return self._sequence
+
     def _get_video_features(self) -> Optional[VideoFeatures]:
         """Get latest video features from reader or synthetic source."""
         if self._video_reader and self._video_analyzer:
@@ -384,7 +408,7 @@ class Engine:
         self._running = False
         self._run_end_wall = time.perf_counter()
         try:
-            self._sequence += 1
+            self._advance_sequence()
             safe_frame = OutputTransform.generate_safe_frame(
                 timestamp=self._timestamp,
                 sequence=self._sequence,

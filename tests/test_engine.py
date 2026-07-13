@@ -52,6 +52,39 @@ class RecordingOutput(NullOutput):
 
 
 class TestFrameSequence:
+    def test_production_restarts_use_newer_wall_clock_sequence_seeds(self, monkeypatch):
+        Config.reset()
+        config = Config()
+        config._data["outputs"]["mode"] = "production"
+        seed_ms = 1_000_000
+        times = iter((seed_ms * 1_000_000, (seed_ms + 20_000) * 1_000_000))
+        monkeypatch.setattr(engine_module.time, "time_ns", lambda: next(times))
+
+        first = Engine(config)
+        first.use_synthetic(seed=42)
+        first.set_effect("static")
+        first_output = RecordingOutput()
+        first_output.open()
+        first._outputs = {"recording": first_output}
+        first.run(max_frames=5)
+
+        second = Engine(config)
+        assert second._sequence > first_output.frames[-1].sequence
+
+    def test_engine_sequence_wraps_as_uint32(self):
+        Config.reset()
+        config = Config()
+        engine = Engine(config, sequence_seed=0xFFFFFFFF)
+        engine.use_synthetic(seed=42)
+        engine.set_effect("static")
+        output = RecordingOutput()
+        output.open()
+        engine._outputs = {"recording": output}
+
+        engine.run(max_frames=1)
+
+        assert [frame.sequence for frame in output.frames] == [0, 1]
+
     def test_engine_reads_final_output_transform_configuration(self):
         Config.reset()
         config = Config()

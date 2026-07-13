@@ -135,6 +135,26 @@ class AudioModulationSpec:
 
 
 @dataclass(frozen=True)
+class BrightnessKeyframe:
+    """One show-time brightness value in a target-level automation track."""
+
+    time: float
+    value: float
+
+
+@dataclass(frozen=True)
+class BrightnessTrackSpec:
+    """A bounded target-level brightness automation track."""
+
+    id: str
+    target: TargetSelector
+    start: float
+    end: float
+    interpolation: str
+    keyframes: tuple[BrightnessKeyframe, ...]
+
+
+@dataclass(frozen=True)
 class Cue:
     id: str
     start: float
@@ -160,3 +180,4 @@ class ShowDefinition:
     cues: tuple[Cue, ...]
     defaults: TransitionSpec = field(default_factory=TransitionSpec)
     virtual_paths: tuple[VirtualPathSpec, ...] = ()
+    brightness_tracks: tuple[BrightnessTrackSpec, ...] = ()

@@ -27,6 +27,13 @@ bool LedOutput::begin() {
   if (!state_.configurationValid()) {
     return false;
   }
+  // Keep every level-shifter input low before enabling its A-to-B direction.
+  // This minimizes WS2811 data glitches while the MCU leaves reset.
+  for (uint8_t index = 0; index < state_.outputCount(); ++index) {
+    const OutputDescriptor &output = state_.descriptor(index);
+    pinMode(output.gpio, OUTPUT);
+    digitalWrite(output.gpio, LOW);
+  }
   for (const uint8_t pin : kDirectionPins) {
     pinMode(pin, OUTPUT);
     digitalWrite(pin, HIGH);

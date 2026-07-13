@@ -16,6 +16,8 @@ from light_engine.show.models import (
     AudioControlSpec,
     AudioModulationChannelSpec,
     AudioModulationSpec,
+    BrightnessKeyframe,
+    BrightnessTrackSpec,
     ColorSpec,
     Cue,
     CueBranchSpec,
@@ -59,6 +61,7 @@ AUDIO_STATES = frozenset(
     }
 )
 MODULATION_CHANNELS = frozenset({"brightness", "speed", "intensity"})
+BRIGHTNESS_INTERPOLATIONS = frozenset({"linear", "step"})
 
 
 class ShowValidationError(ValueError):
@@ -134,7 +137,7 @@ def validate_show_data(data: Any, target_catalog: TargetCatalog) -> ShowDefiniti
     show = _mapping(root.get("show"), "show.show")
     allowed_show = {"id", "duration", "defaults", "cues"}
     if version == 2:
-        allowed_show.add("virtual_paths")
+        allowed_show.update({"virtual_paths", "brightness_tracks"})
     _unknown(show, allowed_show, "show.show")
     show_id = _nonempty_str(show.get("id"), "show.show.id")
     duration = _number(show.get("duration"), "show.show.duration", min_exclusive=0.0)
@@ -152,6 +155,13 @@ def validate_show_data(data: Any, target_catalog: TargetCatalog) -> ShowDefiniti
         virtual_paths=target_catalog.virtual_paths | frozenset(path.id for path in virtual_paths),
     )
     cues = _cues(show.get("cues"), duration, cue_catalog, defaults, version=version)
+    brightness_tracks = (
+        _brightness_tracks(
+            show.get("brightness_tracks", []), duration, cue_catalog
+        )
+        if version == 2
+        else ()
+    )
     if version == 2:
         paths_by_id = {path.id: path for path in virtual_paths}
         for cue_index, cue in enumerate(cues):
@@ -190,6 +200,7 @@ def validate_show_data(data: Any, target_catalog: TargetCatalog) -> ShowDefiniti
         defaults=defaults,
         cues=tuple(cues),
         virtual_paths=tuple(virtual_paths),
+        brightness_tracks=brightness_tracks,
     )
 
 
@@ -398,6 +409,116 @@ def _virtual_paths(value: Any, catalog: TargetCatalog) -> tuple[VirtualPathSpec,
             origin=_choice(item.get("origin", "start"), f"{path}.origin", ORIGINS),
         ))
     return tuple(paths)
+
+
+def _brightness_tracks(
+    value: Any,
+    duration: float,
+    catalog: TargetCatalog,
+) -> tuple[BrightnessTrackSpec, ...]:
+    raw_tracks = _list(value, "show.brightness_tracks")
+    seen: set[str] = set()
+    tracks: list[BrightnessTrackSpec] = []
+    for index, raw in enumerate(raw_tracks):
+        path = f"show.brightness_tracks[{index}]"
+        item = _mapping(raw, path)
+        _unknown(
+            item,
+            {"id", "target", "start", "end", "interpolation", "keyframes"},
+            path,
+        )
+        track_id = _nonempty_str(item.get("id"), f"{path}.id")
+        if track_id in seen:
+            raise ShowValidationError(
+                f"{path}.id", track_id, "duplicate brightness track id"
+            )
+        seen.add(track_id)
+        keyframes = _brightness_keyframes(
+            item.get("keyframes"), f"{path}.keyframes", duration
+        )
+        start = _number(
+            item.get("start", keyframes[0].time),
+            f"{path}.start",
+            minimum=0.0,
+            maximum=duration,
+        )
+        end = _number(
+            item.get("end", keyframes[-1].time),
+            f"{path}.end",
+            minimum=0.0,
+            maximum=duration,
+        )
+        if end <= start:
+            raise ShowValidationError(f"{path}.end", end, "must be > start")
+        if keyframes[0].time < start:
+            raise ShowValidationError(
+                f"{path}.keyframes[0].time",
+                keyframes[0].time,
+                "must be >= track start",
+            )
+        if keyframes[-1].time > end:
+            raise ShowValidationError(
+                f"{path}.keyframes[{len(keyframes) - 1}].time",
+                keyframes[-1].time,
+                "must be <= track end",
+            )
+        tracks.append(
+            BrightnessTrackSpec(
+                id=track_id,
+                target=_target(
+                    item.get("target"), f"{path}.target", catalog, version=2
+                ),
+                start=start,
+                end=end,
+                interpolation=_choice(
+                    item.get("interpolation", "linear"),
+                    f"{path}.interpolation",
+                    BRIGHTNESS_INTERPOLATIONS,
+                ),
+                keyframes=keyframes,
+            )
+        )
+    return tuple(tracks)
+
+
+def _brightness_keyframes(
+    value: Any,
+    path: str,
+    duration: float,
+) -> tuple[BrightnessKeyframe, ...]:
+    raw_keyframes = _list(value, path)
+    if len(raw_keyframes) < 2:
+        raise ShowValidationError(
+            path, raw_keyframes, "must contain at least two keyframes"
+        )
+    keyframes: list[BrightnessKeyframe] = []
+    previous_time: float | None = None
+    for index, raw in enumerate(raw_keyframes):
+        item_path = f"{path}[{index}]"
+        item = _mapping(raw, item_path)
+        _unknown(item, {"time", "value"}, item_path)
+        time = _number(
+            item.get("time"), f"{item_path}.time", minimum=0.0, maximum=duration
+        )
+        if previous_time is not None and time <= previous_time:
+            raise ShowValidationError(
+                f"{item_path}.time",
+                time,
+                "must be strictly greater than the previous keyframe time",
+            )
+        previous_time = time
+        keyframes.append(
+            BrightnessKeyframe(
+                time=time,
+                value=_number(
+                    item.get("value"),
+                    f"{item_path}.value",
+                    minimum=0.0,
+                    maximum=1.0,
+                ),
+            )
+        )
+    return tuple(keyframes)
 
 
 def _branches(value: Any, path: str, catalog: TargetCatalog) -> tuple[CueBranchSpec, ...]:

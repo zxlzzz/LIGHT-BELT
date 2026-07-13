@@ -31,6 +31,53 @@ then compared to normalized cue/path progress. It does not inspect or detect a
 renderer's visible wavefront. All IDs in the set are rendered using the same
 logical frame timestamp and sequence. This is not a general graph/DAG API.
 
+## Target brightness tracks
+
+Optional `brightness_tracks` independently automate the logical output level
+of selected targets after all cue contributions have been composed. A track
+does not create light by itself: black cue output remains black. Final global
+brightness, gamma, and power limiting remain owned by `OutputTransform`.
+
+Each track has a unique `id`, one normal Show v2 `target`, an interpolation
+mode, and at least two keyframes. Keyframe `time` is absolute show time and
+must increase strictly. Brightness `value` is in `[0.0, 1.0]`. Optional
+`start` and `end` bound the active interval; they default to the first and last
+keyframe times.
+
+```yaml
+show:
+  brightness_tracks:
+    - id: left-wall-level
+      target: {type: digital_strip, id: strip_42}
+      interpolation: linear
+      keyframes:
+        - {time: 2.0, value: 0.2}
+        - {time: 5.0, value: 1.0}
+
+    - id: right-wall-level
+      target: {type: digital_set, ids: [strip_43, strip_44]}
+      start: 1.0
+      end: 8.0
+      interpolation: step
+      keyframes:
+        - {time: 1.0, value: 0.4}
+        - {time: 6.0, value: 0.8}
+```
+
+`linear` continuously interpolates between keyframes. `step` holds the
+previous value and changes at the next keyframe. The active interval is
+`start <= time < end`; within it, time before the first keyframe holds the
+first value and time after the last keyframe holds the last value. Outside the
+interval, between separate non-overlapping tracks, on unselected targets, and
+when `brightness_tracks` is omitted, the neutral level is `1.0`. Authors only
+write the targets and time ranges that need dimming; there is no per-frame or
+per-second fill requirement. An explicit `end` after the final `step`
+keyframe holds that final value until the interval closes.
+
+Multiple tracks may address the same concrete target only when their active
+time ranges do not overlap. Any overlap after target resolution fails
+explicitly instead of relying on declaration order.
+
 For a visible chase that forks after one shared strip, do not use a bounded
 branch as a wavefront detector. Author one virtual path per destination with
 the same prefix, then run identical fixed `chase` cues over those paths. For

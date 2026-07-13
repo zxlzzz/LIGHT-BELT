@@ -23,7 +23,13 @@ from light_engine.models import (
 )
 from light_engine.show.adaptive_selector import AdaptiveEffectSelector, fixed_decision
 from light_engine.show.audio_modulation import CueAudioModulator
-from light_engine.show.models import Cue, ShowDefinition, TargetSelector, VirtualPathSpec
+from light_engine.show.models import (
+    BrightnessTrackSpec,
+    Cue,
+    ShowDefinition,
+    TargetSelector,
+    VirtualPathSpec,
+)
 
 
 @dataclass(frozen=True)
@@ -71,6 +77,15 @@ class FrameContribution:
     weight: float = 1.0
     digital: tuple[DigitalContribution, ...] = ()
     analog: tuple[AnalogContribution, ...] = ()
+
+
+@dataclass(frozen=True)
+class ResolvedBrightnessTrack:
+    """One brightness track expanded to concrete logical target IDs."""
+
+    spec: BrightnessTrackSpec
+    analog_zone_ids: tuple[str, ...] = ()
+    digital_strip_ids: tuple[str, ...] = ()
 
 
 class TargetResolver:
@@ -605,6 +620,9 @@ class ShowRuntime:
         resolver.register_authored_paths(show.virtual_paths)
         self._seed = seed
         self._effect_factory = effect_factory
+        self._brightness_tracks = _resolve_brightness_tracks(
+            show.brightness_tracks, resolver
+        )
         self._jobs = tuple(
             CueRenderJob(
                 cue,
@@ -653,6 +671,9 @@ class ShowRuntime:
                 active.append(job.render(ctx))
                 active.extend(job.render_branches(ctx))
         frame = compose_frame(base, active)
+        frame = apply_brightness_tracks(
+            frame, self._brightness_tracks, ctx.timestamp
+        )
         self._last_timestamp = ctx.timestamp
         self._last_frame = frame
         return frame
@@ -680,6 +701,130 @@ def transition_weight(cue: Cue, t: float) -> float:
     fade_in_factor = 1.0 if fade_in == 0.0 else _clamp01((t - cue.start) / fade_in)
     fade_out_factor = 1.0 if fade_out == 0.0 else _clamp01((cue.end - t) / fade_out)
     return min(fade_in_factor, fade_out_factor)
+
+
+def evaluate_brightness_track(
+    track: BrightnessTrackSpec, t: float
+) -> float | None:
+    """Evaluate one bounded show-time track, or return the neutral gap marker."""
+
+    keyframes = track.keyframes
+    if t < track.start or t >= track.end:
+        return None
+    if t <= keyframes[0].time:
+        return keyframes[0].value
+    for index, current in enumerate(keyframes):
+        if math.isclose(t, current.time, rel_tol=0.0, abs_tol=1e-12):
+            return current.value
+        if t < current.time:
+            previous = keyframes[index - 1]
+            if track.interpolation == "step":
+                return previous.value
+            progress = (t - previous.time) / (current.time - previous.time)
+            return previous.value + (current.value - previous.value) * progress
+    return keyframes[-1].value
+
+
+def apply_brightness_tracks(
+    frame: PixelFrame,
+    tracks: Sequence[ResolvedBrightnessTrack],
+    t: float,
+) -> PixelFrame:
+    """Apply active target-level tracks after show composition.
+
+    Targets and time ranges with no active track retain the neutral level 1.0.
+    Global output brightness remains owned by ``OutputTransform``.
+    """
+
+    digital_levels: dict[str, float] = {}
+    analog_levels: dict[str, float] = {}
+    for track in tracks:
+        value = evaluate_brightness_track(track.spec, t)
+        if value is None:
+            continue
+        digital_levels.update(
+            (strip_id, value) for strip_id in track.digital_strip_ids
+        )
+        analog_levels.update(
+            (zone_id, value) for zone_id in track.analog_zone_ids
+        )
+    if not digital_levels and not analog_levels:
+        return frame
+
+    def scale(channel: float, level: float) -> float:
+        return _clamp01(channel * level)
+
+    return PixelFrame(
+        timestamp=frame.timestamp,
+        sequence=frame.sequence,
+        strips=[
+            DigitalStrip(
+                strip_id=strip.strip_id,
+                pixel_count=strip.pixel_count,
+                pixels=[
+                    tuple(
+                        scale(channel, digital_levels.get(strip.strip_id, 1.0))
+                        for channel in pixel
+                    )
+                    for pixel in strip.pixels
+                ],
+            )
+            for strip in frame.strips
+        ],
+        zones=[
+            ZoneOutput(
+                zone_id=zone.zone_id,
+                color=RGBCCTColor(
+                    r=scale(zone.color.r, analog_levels.get(zone.zone_id, 1.0)),
+                    g=scale(zone.color.g, analog_levels.get(zone.zone_id, 1.0)),
+                    b=scale(zone.color.b, analog_levels.get(zone.zone_id, 1.0)),
+                    warm_white=scale(
+                        zone.color.warm_white, analog_levels.get(zone.zone_id, 1.0)
+                    ),
+                    cool_white=scale(
+                        zone.color.cool_white, analog_levels.get(zone.zone_id, 1.0)
+                    ),
+                ),
+            )
+            for zone in frame.zones
+        ],
+        metadata=dict(frame.metadata),
+    )
+
+
+def _resolve_brightness_tracks(
+    tracks: Sequence[BrightnessTrackSpec],
+    resolver: TargetResolver,
+) -> tuple[ResolvedBrightnessTrack, ...]:
+    def resolve(track: BrightnessTrackSpec) -> ResolvedBrightnessTrack:
+        target = resolver.resolve(track.target)
+        return ResolvedBrightnessTrack(
+            spec=track,
+            analog_zone_ids=tuple(zone.id for zone in target.analog_zones),
+            digital_strip_ids=tuple(strip.id for strip in target.digital_strips),
+        )
+
+    resolved_tracks = tuple(resolve(track) for track in tracks)
+    for index, current in enumerate(resolved_tracks):
+        current_start = current.spec.start
+        current_end = current.spec.end
+        for previous in resolved_tracks[:index]:
+            previous_start = previous.spec.start
+            previous_end = previous.spec.end
+            if max(current_start, previous_start) >= min(current_end, previous_end):
+                continue
+            overlapping = (
+                set(current.analog_zone_ids) & set(previous.analog_zone_ids)
+            ) | (
+                set(current.digital_strip_ids) & set(previous.digital_strip_ids)
+            )
+            if overlapping:
+                targets = ", ".join(sorted(overlapping))
+                raise ValueError(
+                    f"brightness tracks {previous.spec.id!r} and {current.spec.id!r} "
+                    f"overlap for target(s): {targets}"
+                )
+    return resolved_tracks
 
 
 def _strip_def(strip: ZoneDef) -> Mapping[str, Any]:

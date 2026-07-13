@@ -23,6 +23,13 @@ ESP32, level shifters, WS2811 strips, 24V supply return, and 5V buck return.
 The 24V strip power is parallel power, not a data daisy chain.  This electrical
 description and all GPIO assignments are NOT HARDWARE VERIFIED.
 
+For deterministic reset behavior, hold each SN74LVC1T45 A-side data input low
+with an external 10 kOhm pull-down and keep `DIR` defined high with a direct
+3V3 connection or pull-up. A 220-470 Ohm series resistor near each strip DI is
+also recommended. Firmware drives GPIO4/5/6 low before enabling the direction
+signals, but external biasing is still required while the MCU itself is held
+in reset and its GPIOs are high-impedance.
+
 The parser validates the whole datagram—v3 header, node, CRC, configured
 output IDs, GPIOs, lengths, output set, and sequence—before any displayed
 buffer changes.  An accepted packet stages every output, then performs exactly
