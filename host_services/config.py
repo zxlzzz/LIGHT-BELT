@@ -25,6 +25,11 @@ SCENE_FILE_PATH = "data/scenes.json"    # 运行时数据，不进 git
 # ── 节目单 ──
 SHOWS_MANIFEST_PATH = "data/shows_manifest.json"  # 运行时数据，不进 git
 
+# ── TLS（生产部署用，本地默认关闭） ──
+ENABLE_TLS = False
+TLS_CERTFILE = "/etc/light-belt/cert.pem"
+TLS_KEYFILE = "/etc/light-belt/key.pem"
+
 # ── mpv IPC（生产环境用） ──
 MPV_SOCKET_PATH = "/tmp/mpv.sock"
 
