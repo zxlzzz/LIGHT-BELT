@@ -25,6 +25,7 @@ output/
 logs/
 *.log
 artifacts/runs/
+data/
 
 # Local tools, worktrees, and bootstrap caches
 .agent-worktrees/
