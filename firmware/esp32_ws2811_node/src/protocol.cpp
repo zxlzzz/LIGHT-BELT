@@ -116,12 +116,19 @@ ParseResult parseUdpV3Frame(
     return ParseResult::BadCrc;
   }
 
+  const uint64_t apply_at_us = readU64(data + 18);
+  const bool scheduled =
+      (data[5] & UDP_V3_FLAG_SCHEDULED_APPLY) != 0;
+  if (scheduled != (apply_at_us != 0)) {
+    return ParseResult::BadSchedule;
+  }
+
   UdpV3Frame parsed{};
   parsed.node_id = data[4];
   parsed.flags = data[5];
   parsed.sequence = readU32(data + 6);
   parsed.media_timestamp_us = readU64(data + 10);
-  parsed.apply_at_us = readU64(data + 18);
+  parsed.apply_at_us = apply_at_us;
   parsed.output_count = output_count;
   parsed.payload_len = payload_len;
 
@@ -181,6 +188,36 @@ ParseResult parseUdpV3Frame(
     *out = parsed;
   }
   return ParseResult::Ok;
+}
+
+ClockBeaconParseResult parseUdpV3ClockBeacon(
+    const uint8_t *data,
+    size_t len,
+    UdpV3ClockBeacon *out) {
+  if (data == nullptr || len != UDP_V3_CLOCK_BEACON_LEN) {
+    return ClockBeaconParseResult::BadLength;
+  }
+  if (readU16(data) != UDP_V3_MAGIC) {
+    return ClockBeaconParseResult::BadMagic;
+  }
+  if (data[2] != UDP_V3_VERSION) {
+    return ClockBeaconParseResult::BadVersion;
+  }
+  if (data[3] != UDP_V3_MESSAGE_CLOCK_BEACON) {
+    return ClockBeaconParseResult::BadMessageType;
+  }
+  const uint32_t expected_crc =
+      readU32(data + UDP_V3_CLOCK_BEACON_LEN - UDP_V3_CRC_LEN);
+  if (crc32Ethernet(
+          data, UDP_V3_CLOCK_BEACON_LEN - UDP_V3_CRC_LEN) != expected_crc) {
+    return ClockBeaconParseResult::BadCrc;
+  }
+
+  if (out != nullptr) {
+    out->beacon_sequence = readU32(data + 4);
+    out->host_monotonic_us = readU64(data + 8);
+  }
+  return ClockBeaconParseResult::Ok;
 }
 
 bool isNewerSequence(uint32_t candidate, uint32_t previous) {

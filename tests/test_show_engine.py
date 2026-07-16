@@ -137,3 +137,57 @@ def test_run_show_accepts_adaptive_runtime(monkeypatch):
 
     assert result == 0
     assert sent
+
+
+def test_run_show_returns_failure_when_output_run_raises(monkeypatch, capsys):
+    def fail_run(_self, **_kwargs):
+        raise OSError("production send failed")
+
+    monkeypatch.setattr(cli.Engine, "run", fail_run)
+    Config.reset()
+    args = Namespace(
+        config=None,
+        clock="offline",
+        mpv_socket=None,
+        video=None,
+        audio=None,
+        effect=None,
+        show="config/examples/teacher-demo-show-v2.yaml",
+        duration=0.1,
+        max_frames=1,
+    )
+
+    result = cli.cmd_run(args)
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "output run failed: production send failed" in captured.err
+    assert "Output health summary" in captured.out
+
+
+def test_run_show_returns_failure_when_output_initialization_raises(
+    monkeypatch, capsys
+):
+    def fail_init(_self):
+        raise OSError("production socket failed")
+
+    monkeypatch.setattr(cli.Engine, "init_outputs", fail_init)
+    Config.reset()
+    args = Namespace(
+        config=None,
+        clock="offline",
+        mpv_socket=None,
+        video=None,
+        audio=None,
+        effect=None,
+        show="config/examples/teacher-demo-show-v2.yaml",
+        duration=0.1,
+        max_frames=1,
+    )
+
+    result = cli.cmd_run(args)
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "output initialization failed: production socket failed" in captured.err
+    assert "Output health summary" in captured.out

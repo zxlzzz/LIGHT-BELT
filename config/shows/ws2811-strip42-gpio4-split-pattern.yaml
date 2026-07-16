@@ -1,0 +1,30 @@
+# One GPIO4 stream: groups 1-10 red and groups 11-20 blue.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-strip42-gpio4-split-pattern"
+  duration: 10.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "first-ten-red"
+      start: 0.0
+      end: 10.0
+      priority: 10
+      target: {type: "virtual_path", id: "strip42_first_10"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [1.0, 0.0, 0.0]}
+
+    - id: "last-ten-blue"
+      start: 0.0
+      end: 10.0
+      priority: 10
+      target: {type: "virtual_path", id: "strip42_last_10"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.0, 0.0, 1.0]}

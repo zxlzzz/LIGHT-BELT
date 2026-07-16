@@ -1,0 +1,88 @@
+# Installed UDP v3 topology for the nine strips currently in scope. Each strip
+# has one ESP32 and one GPIO4 output. Physical wiring and addresses are
+# NOT HARDWARE VERIFIED.
+
+outputs:
+  mode: "production"
+  enabled: ["udp_v3"]
+  exit_safe_state: true
+  udp_v3:
+    enabled: true
+    protocol_version: 3
+    presentation:
+      mode: "scheduled"
+      lead_us: 20000
+      session_start_repeats: 3
+      session_start_spacing_us: 2000
+      beacon:
+        host: "192.168.31.255"
+        port: 9001
+        interval_us: 500000
+        startup_count: 5
+        startup_spacing_us: 10000
+  rs485_v2:
+    enabled: false
+
+system:
+  platform: "windows"
+  output_fps: 30.0
+  clock:
+    mode: "internal"
+  smoothing:
+    max_brightness: 0.65
+    gamma: 1.30
+
+layout:
+  topology_version: 3
+  digital_output_policy: "one_output_gpio4"
+  total_strips: 9
+  zones:
+    - id: "zone_32"
+      type: "rgbcct"
+      label: "COB installation 32 (UDP-only show placeholder)"
+      video_zone: "left"
+      direction: "forward"
+  analog_nodes:
+    - node_id: 17
+      zone_id: "zone_32"
+      video_zone: "left"
+      channel_order: "RGBWC"
+      fade_ms: 0
+  strips:
+    - {id: "strip_11", type: digital, pixel_count: 10, video_zone: top, direction: forward}
+    - {id: "strip_21", type: digital, pixel_count: 10, video_zone: bottom, direction: forward}
+    - {id: "strip_31", type: digital, pixel_count: 10, video_zone: left, direction: forward}
+    - {id: "strip_41", type: digital, pixel_count: 10, video_zone: right, direction: forward}
+    - {id: "strip_42", type: digital, pixel_count: 20, video_zone: right, direction: forward}
+    - {id: "strip_12", type: digital, pixel_count: 40, video_zone: top, direction: forward}
+    - {id: "strip_91", type: digital, pixel_count: 20, video_zone: top, direction: forward}
+    - {id: "strip_92", type: digital, pixel_count: 20, video_zone: top, direction: forward}
+    - {id: "strip_22", type: digital, pixel_count: 40, video_zone: bottom, direction: forward}
+  digital_nodes:
+    - {node_id: 1, host: "192.168.31.201", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 2, host: "192.168.31.202", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 4, host: "192.168.31.204", port: 9001, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 5, host: "192.168.31.205", port: 9001, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 6, host: "192.168.31.206", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 7, host: "192.168.31.207", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 8, host: "192.168.31.208", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 9, host: "192.168.31.209", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 10, host: "192.168.31.210", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+  digital_segments: []
+  digital_outputs:
+    - {node_id: 1, output_id: 1, gpio: 4, strip_id: "strip_11", pixel_count: 10, direction: forward}
+    - {node_id: 2, output_id: 1, gpio: 4, strip_id: "strip_41", pixel_count: 10, direction: forward}
+    - {node_id: 4, output_id: 1, gpio: 4, strip_id: "strip_12", pixel_count: 40, direction: forward}
+    - {node_id: 5, output_id: 1, gpio: 4, strip_id: "strip_22", pixel_count: 40, direction: forward}
+    - {node_id: 6, output_id: 1, gpio: 4, strip_id: "strip_21", pixel_count: 10, direction: forward}
+    - {node_id: 7, output_id: 1, gpio: 4, strip_id: "strip_31", pixel_count: 10, direction: forward}
+    - {node_id: 8, output_id: 1, gpio: 4, strip_id: "strip_42", pixel_count: 20, direction: forward}
+    - {node_id: 9, output_id: 1, gpio: 4, strip_id: "strip_91", pixel_count: 20, direction: forward}
+    - {node_id: 10, output_id: 1, gpio: 4, strip_id: "strip_92", pixel_count: 20, direction: forward}
+  virtual_paths: []
+  video_zone_map:
+    left: ["zone_32", "strip_31"]
+    right: ["strip_41", "strip_42"]
+    top: ["strip_11", "strip_12", "strip_91", "strip_92"]
+    bottom: ["strip_21", "strip_22"]
+    center: []

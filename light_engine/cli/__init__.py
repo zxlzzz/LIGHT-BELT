@@ -122,7 +122,12 @@ def cmd_run(args: argparse.Namespace) -> int:
             return 1
     else:
         engine.set_effect(args.effect or "video_audio_fusion")
-    engine.init_outputs()
+    try:
+        engine.init_outputs()
+    except Exception as exc:
+        print(f"Error: output initialization failed: {exc}", file=sys.stderr)
+        _print_health_summary(engine._outputs)
+        return 1
 
     print(f"Light Engine v{__version__} - Run Mode")
     print(f"  Video: {args.video or 'generated'}")
@@ -132,7 +137,15 @@ def cmd_run(args: argparse.Namespace) -> int:
     else:
         print(f"  Effect: {args.effect or 'video_audio_fusion'}")
 
-    engine.run(duration=args.duration if args.duration is not None else show_duration, max_frames=args.max_frames)
+    try:
+        engine.run(
+            duration=args.duration if args.duration is not None else show_duration,
+            max_frames=args.max_frames,
+        )
+    except Exception as exc:
+        print(f"Error: output run failed: {exc}", file=sys.stderr)
+        _print_health_summary(engine._outputs)
+        return 1
 
     stats = engine.get_fps_stats()
     print(f"\nCompleted: {stats['frame_count']} frames")
@@ -140,6 +153,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"  Processing capacity: {stats['processing_capacity']:.1f} FPS")
     _print_health_summary(engine._outputs)
 
+    summary = health_summary(engine._outputs)
+    if summary["totals"]["healthy_outputs"] != summary["totals"]["outputs"]:
+        print("Error: one or more outputs are unhealthy", file=sys.stderr)
+        return 1
     return 0
 
 

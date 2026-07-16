@@ -1,0 +1,50 @@
+# Stage 2 hardware gate: a deterministic cross-fade from strip 41 to strip 42.
+# The two logical strips may live on different physical nodes; the profile owns
+# that mapping and both contributions keep one shared logical sequence.
+schema_version: 2
+
+show:
+  id: "ws2811-stage2-strip41-to-strip42"
+  duration: 15.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  brightness_tracks:
+    - id: "stage2-strip41-level"
+      target: {type: "digital_strip", id: "strip_41"}
+      start: 0.0
+      end: 15.0
+      interpolation: "linear"
+      keyframes:
+        - {time: 0.0, value: 1.0}
+        - {time: 5.0, value: 1.0}
+        - {time: 10.0, value: 0.0}
+        - {time: 15.0, value: 0.0}
+    - id: "stage2-strip42-level"
+      target: {type: "digital_strip", id: "strip_42"}
+      start: 0.0
+      end: 15.0
+      interpolation: "linear"
+      keyframes:
+        - {time: 0.0, value: 0.0}
+        - {time: 5.0, value: 0.0}
+        - {time: 10.0, value: 1.0}
+        - {time: 15.0, value: 1.0}
+
+  cues:
+    - id: "stage2-source-strip41"
+      start: 0.0
+      end: 15.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: &transfer_color {mode: "solid", color: [0.18, 0.52, 0.32]}
+    - id: "stage2-destination-strip42"
+      start: 0.0
+      end: 15.0
+      target: {type: "digital_strip", id: "strip_42"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: *transfer_color

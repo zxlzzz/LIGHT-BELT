@@ -1,0 +1,11 @@
+#ifndef LIGHT_BELT_ESP32_NODE_11_H
+#define LIGHT_BELT_ESP32_NODE_11_H
+
+#define NODE_ID 11
+#define NODE_IPV4_D 211
+#define OUTPUT_COUNT 1
+#define OUTPUT_0_ID 1
+#define OUTPUT_0_GPIO 4
+#define OUTPUT_0_PIXELS 20
+
+#endif

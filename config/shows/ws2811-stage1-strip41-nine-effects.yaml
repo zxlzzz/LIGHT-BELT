@@ -1,0 +1,119 @@
+# Stage 1 hardware gate: nine authored effects on strip 41 only.
+# The show has no video, audio, beat, adaptive, or modulation dependency.
+schema_version: 2
+
+show:
+  id: "ws2811-stage1-strip41-nine-effects"
+  duration: 90.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "stage1-static"
+      start: 0.0
+      end: 10.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.62, 0.28, 0.07]}
+
+    - id: "stage1-breath"
+      start: 10.0
+      end: 20.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 4.0, min_brightness: 0.35}
+      color: {mode: "solid", color: [0.60, 0.46, 0.14]}
+
+    - id: "stage1-color-wave"
+      start: 20.0
+      end: 30.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "color_wave"
+        params: {speed: 0.12, width: 0.9, hue_cycle_rate: 0.04}
+      color: {mode: "effect_default"}
+
+    - id: "stage1-chase"
+      start: 30.0
+      end: 40.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "chase"
+        params:
+          speed: 2.0
+          width: 2
+          gap: 6
+          direction: "forward"
+          trail: 0.65
+          color_source: "static"
+          beat_boost: 0.0
+      color: {mode: "solid", color: [0.22, 0.58, 0.28]}
+
+    - id: "stage1-comet"
+      start: 40.0
+      end: 50.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "comet"
+        params: {speed: 2.5, tail_length: 0.4, decay: 0.88}
+      color: {mode: "solid", color: [0.18, 0.52, 0.46]}
+
+    - id: "stage1-calm"
+      start: 50.0
+      end: 60.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "calm"
+        params: {period: 8.0}
+      color: {mode: "solid", color: [0.18, 0.34, 0.58]}
+
+    - id: "stage1-demo"
+      start: 60.0
+      end: 70.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "demo"
+        params:
+          cycle_interval: 1.0
+          effects:
+            - "static"
+            - "breath"
+            - "color_wave"
+            - "chase"
+            - "comet"
+            - "calm"
+            - "color_wipe"
+            - "twinkle"
+      color: {mode: "solid", color: [0.42, 0.30, 0.62]}
+
+    - id: "stage1-color-wipe"
+      start: 70.0
+      end: 80.0
+      target: {type: "digital_strip", id: "strip_41"}
+      origin: "start"
+      effect:
+        mode: "fixed"
+        id: "color_wipe"
+        params: {speed: 1.0}
+      color: {mode: "solid", color: [0.44, 0.24, 0.62]}
+
+    - id: "stage1-twinkle"
+      start: 80.0
+      end: 90.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "twinkle"
+        params: {density: 0.6, fade_time: 0.8, color_source: "solid"}
+      color: {mode: "solid", color: [0.52, 0.58, 0.30]}

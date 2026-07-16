@@ -44,7 +44,6 @@ def _package_roots(project_dir: Path) -> list[Path]:
         [
             _path_from_subst("$PROJECT_PACKAGES_DIR", project_dir),
             project_dir / ".pio" / "packages",
-            Path.home() / ".platformio" / "packages",
         ]
     )
 
@@ -113,6 +112,12 @@ def _print_diagnostics(
 
 if os.name == "nt":
     project_dir = Path(env.subst("$PROJECT_DIR")).expanduser()
+    temp_dir = project_dir / ".pio" / "tmp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    for variable in ("TEMP", "TMP", "TMPDIR"):
+        os.environ[variable] = str(temp_dir)
+        env["ENV"][variable] = str(temp_dir)
+
     shim_dir = project_dir / "tools"
     env.PrependENVPath("PYTHONPATH", str(shim_dir))
 
@@ -123,4 +128,5 @@ if os.name == "nt":
     if include_paths:
         env.Prepend(CPPPATH=[str(path) for path in include_paths])
 
+    print(f"[platformio-windows-sandbox] compiler temp: {temp_dir}")
     _print_diagnostics(package_roots, toolchain_root, include_paths)

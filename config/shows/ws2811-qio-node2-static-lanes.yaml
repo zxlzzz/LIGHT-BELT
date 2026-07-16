@@ -1,0 +1,36 @@
+# Legacy QIO multi-output diagnostic, retained only as hardware investigation.
+# Three distinct static lane payloads are resent for 60s.
+# Node 2 strip 43 may remain physically disconnected; it stays in every frame.
+schema_version: 2
+
+show:
+  id: "ws2811-qio-node2-static-lanes"
+  duration: 60.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "qio-data0-strip41-orange"
+      start: 0.0
+      end: 60.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.62, 0.28, 0.07]}
+
+    - id: "qio-data1-strip42-blue"
+      start: 0.0
+      end: 60.0
+      target: {type: "digital_strip", id: "strip_42"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.08, 0.30, 0.62]}
+
+    - id: "qio-data2-strip43-magenta"
+      start: 0.0
+      end: 60.0
+      target: {type: "digital_strip", id: "strip_43"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.52, 0.08, 0.34]}

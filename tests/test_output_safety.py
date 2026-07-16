@@ -128,6 +128,25 @@ def test_create_outputs_rejects_legacy_v1_output_names() -> None:
         create_outputs(config)
 
 
+@pytest.mark.parametrize(
+    ("enabled", "message"),
+    [
+        (["udp_v33"], "Unknown outputs.enabled entries: udp_v33"),
+        ([], "must select at least one output"),
+        (["udp_v3", "udp_v3"], "entries must be unique"),
+    ],
+)
+def test_create_outputs_rejects_unknown_or_empty_output_selection(
+    enabled: list[str], message: str
+) -> None:
+    Config.reset()
+    config = Config()
+    config._data["outputs"]["enabled"] = enabled
+
+    with pytest.raises(ValueError, match=message):
+        create_outputs(config)
+
+
 def test_open_all_reraises_production_open_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     class BadSerialModule:
         class Serial:
@@ -152,13 +171,14 @@ def test_open_all_reraises_production_open_failure(monkeypatch: pytest.MonkeyPat
     assert output.health().healthy is False
 
 
-def test_production_send_failure_is_logged_and_never_falls_back(
+def test_production_send_failure_is_reraised_and_never_falls_back(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     output = SerialOutputV2(mode=OutputMode.PRODUCTION, transport=FailingSerial())
     output.open()
 
-    send_all({"rs485_v2": output}, _frame())
+    with pytest.raises(OSError, match="serial write failed"):
+        send_all({"rs485_v2": output}, _frame())
 
     assert output.health().healthy is False
     assert output.get_memory_bytes() == b""

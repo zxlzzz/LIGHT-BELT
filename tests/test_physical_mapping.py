@@ -134,7 +134,7 @@ def test_default_config_maps_six_analog_nodes_and_one_digital_node() -> None:
     assert layout.get_virtual_path("screen_to_wall").total_length == 172
 
 
-def test_cabin_v3_profile_maps_thirteen_strips_to_five_multi_output_nodes() -> None:
+def test_cabin_v3_profile_maps_thirteen_strips_to_thirteen_single_output_nodes() -> None:
     from pathlib import Path
 
     config = Config(Path("config/profiles/cabin-lighting-v3-production.yaml"))
@@ -152,9 +152,13 @@ def test_cabin_v3_profile_maps_thirteen_strips_to_five_multi_output_nodes() -> N
 
     assert len(layout.strips) == 13
     assert layout.total_digital_pixels() == 260
-    assert [node.node_id for node in physical.digital_frames] == [1, 2, 3, 4, 5]
-    assert [len(node.outputs) for node in physical.digital_frames] == [3, 3, 3, 3, 1]
-    assert [output.gpio for output in physical.digital_frames[1].outputs] == [4, 5, 6]
+    assert [node.node_id for node in physical.digital_frames] == list(range(1, 14))
+    assert [len(node.outputs) for node in physical.digital_frames] == [1] * 13
+    assert [node.outputs[0].output_id for node in physical.digital_frames] == [1] * 13
+    assert [node.outputs[0].gpio for node in physical.digital_frames] == [4] * 13
+    assert [len(node.outputs[0].pixels) for node in physical.digital_frames] == [
+        10, 10, 20, 40, 40, 10, 10, 20, 20, 20, 20, 20, 20
+    ]
     assert all(node.pixels == [] for node in physical.digital_frames)
 
 
@@ -166,7 +170,7 @@ def test_physical_mapping_rejects_v3_node_length_not_equal_to_outputs() -> None:
     layout = Layout.from_config(config)
     layout.digital_nodes[1] = replace(layout.digital_nodes[1], pixel_count=1)
 
-    with pytest.raises(ValueError, match=r"output pixel total 50.*node pixel_count 1"):
+    with pytest.raises(ValueError, match=r"output pixel total 10.*node pixel_count 1"):
         PhysicalMapping(layout)
 
 

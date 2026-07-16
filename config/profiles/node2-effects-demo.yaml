@@ -1,0 +1,58 @@
+# Legacy Node 2 three-output diagnostic profile for authored effects shows.
+# It is incompatible with the single-output esp32-s3-node-2 production image.
+# Physical address, color order, wiring, and comfort are NOT HARDWARE VERIFIED.
+
+outputs:
+  mode: "production"
+  enabled: ["udp_v3"]
+  exit_safe_state: true
+  udp_v3:
+    enabled: true
+    protocol_version: 3
+    presentation:
+      mode: "immediate"
+  rs485_v2:
+    enabled: false
+
+system:
+  platform: "windows"
+  clock:
+    mode: "internal"
+  smoothing:
+    max_brightness: 0.65
+    gamma: 1.30
+
+layout:
+  topology_version: 3
+  digital_output_policy: "multi_output_diagnostic"
+  total_strips: 3
+  zones:
+    - id: "zone_32"
+      type: "rgbcct"
+      label: "COB installation 32 (disabled in node 2 demo)"
+      video_zone: "left"
+      direction: "forward"
+  analog_nodes:
+    - node_id: 17
+      zone_id: "zone_32"
+      video_zone: "left"
+      channel_order: "RGBWC"
+      fade_ms: 0
+  strips:
+    - {id: "strip_41", type: digital, pixel_count: 10, video_zone: right, direction: forward}
+    - {id: "strip_42", type: digital, pixel_count: 20, video_zone: right, direction: forward}
+    - {id: "strip_43", type: digital, pixel_count: 20, video_zone: right, direction: forward}
+  digital_nodes:
+    - {node_id: 2, host: "192.168.31.202", port: 9001, pixel_count: 50, max_udp_payload: 1400, protocol_version: 3}
+  digital_segments: []
+  digital_outputs:
+    - {node_id: 2, output_id: 1, gpio: 4, strip_id: "strip_41", pixel_count: 10, direction: forward}
+    - {node_id: 2, output_id: 2, gpio: 5, strip_id: "strip_42", pixel_count: 20, direction: forward}
+    - {node_id: 2, output_id: 3, gpio: 6, strip_id: "strip_43", pixel_count: 20, direction: forward}
+  virtual_paths: []
+  video_zone_map:
+    left: ["zone_32"]
+    right: ["strip_41", "strip_42", "strip_43"]
+    top: []
+    bottom: []
+    center: []

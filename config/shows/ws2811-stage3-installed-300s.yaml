@@ -1,0 +1,86 @@
+# Stage 3 transport gate for the nine currently installed logical strips.
+# Every effect is fixed and independent of video, audio, beat, and modulation.
+# Physical node allocation is owned by the runtime profile, not this show.
+schema_version: 2
+
+show:
+  id: "ws2811-stage3-installed-300s"
+  duration: 300.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  virtual_paths:
+    - id: "installed-forward-path"
+      origin: "start"
+      targets:
+        - {type: "digital_strip", id: "strip_11"}
+        - {type: "digital_strip", id: "strip_21"}
+        - {type: "digital_strip", id: "strip_31"}
+        - {type: "digital_strip", id: "strip_41"}
+        - {type: "digital_strip", id: "strip_42"}
+        - {type: "digital_strip", id: "strip_12"}
+        - {type: "digital_strip", id: "strip_91"}
+        - {type: "digital_strip", id: "strip_92"}
+        - {type: "digital_strip", id: "strip_22"}
+
+  cues:
+    - id: "stage3-static-all"
+      start: 0.0
+      end: 60.0
+      target: &all_active
+        type: "digital_set"
+        ids: ["strip_11", "strip_21", "strip_31", "strip_41", "strip_42", "strip_12", "strip_91", "strip_92", "strip_22"]
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.52, 0.24, 0.06]}
+
+    - id: "stage3-breath-all"
+      start: 60.0
+      end: 120.0
+      target: *all_active
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 8.0, min_brightness: 0.40}
+      color: {mode: "solid", color: [0.56, 0.44, 0.14]}
+
+    - id: "stage3-color-wave-all"
+      start: 120.0
+      end: 180.0
+      target: *all_active
+      effect:
+        mode: "fixed"
+        id: "color_wave"
+        params: {speed: 0.10, width: 1.1, hue_cycle_rate: 0.03}
+      color: {mode: "effect_default"}
+
+    - id: "stage3-chase-all"
+      start: 180.0
+      end: 240.0
+      target: *all_active
+      effect:
+        mode: "fixed"
+        id: "chase"
+        params:
+          speed: 3.0
+          width: 2
+          gap: 6
+          direction: "forward"
+          trail: 0.60
+          color_source: "static"
+          beat_boost: 0.0
+      color: {mode: "solid", color: [0.20, 0.54, 0.34]}
+
+    - id: "stage3-forward-wipe"
+      start: 240.0
+      end: 300.0
+      target: {type: "virtual_path", id: "installed-forward-path"}
+      origin: "start"
+      effect:
+        mode: "fixed"
+        id: "color_wipe"
+        params: {speed: 3.1}
+      color: {mode: "solid", color: [0.18, 0.38, 0.58]}

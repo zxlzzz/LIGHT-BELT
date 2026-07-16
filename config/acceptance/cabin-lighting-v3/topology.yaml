@@ -1,5 +1,6 @@
-# Phase 29 static acceptance fixture.  It records the approved provisional
-# topology without becoming a production runtime profile.  NOT HARDWARE VERIFIED.
+# Phase 31 static acceptance fixture. It records the approved one-ESP32-per-
+# strip topology without becoming a production runtime profile.
+# NOT HARDWARE VERIFIED.
 acceptance:
   topology_version: 3
   analog:
@@ -10,11 +11,19 @@ acceptance:
     total_strips: 13
     total_pixel_groups: 260
     nodes:
-      - {node_id: 1, outputs: [{output_id: 1, gpio: 4, strip_id: strip_11, pixel_count: 10}, {output_id: 2, gpio: 5, strip_id: strip_21, pixel_count: 10}, {output_id: 3, gpio: 6, strip_id: strip_31, pixel_count: 10}]}
-      - {node_id: 2, outputs: [{output_id: 1, gpio: 4, strip_id: strip_41, pixel_count: 10}, {output_id: 2, gpio: 5, strip_id: strip_42, pixel_count: 20}, {output_id: 3, gpio: 6, strip_id: strip_43, pixel_count: 20}]}
-      - {node_id: 3, outputs: [{output_id: 1, gpio: 4, strip_id: strip_44, pixel_count: 20}, {output_id: 2, gpio: 5, strip_id: strip_45, pixel_count: 20}, {output_id: 3, gpio: 6, strip_id: strip_93, pixel_count: 20}]}
-      - {node_id: 4, outputs: [{output_id: 1, gpio: 4, strip_id: strip_12, pixel_count: 40}, {output_id: 2, gpio: 5, strip_id: strip_91, pixel_count: 20}, {output_id: 3, gpio: 6, strip_id: strip_92, pixel_count: 20}]}
+      - {node_id: 1, outputs: [{output_id: 1, gpio: 4, strip_id: strip_11, pixel_count: 10}]}
+      - {node_id: 2, outputs: [{output_id: 1, gpio: 4, strip_id: strip_41, pixel_count: 10}]}
+      - {node_id: 3, outputs: [{output_id: 1, gpio: 4, strip_id: strip_44, pixel_count: 20}]}
+      - {node_id: 4, outputs: [{output_id: 1, gpio: 4, strip_id: strip_12, pixel_count: 40}]}
       - {node_id: 5, outputs: [{output_id: 1, gpio: 4, strip_id: strip_22, pixel_count: 40}]}
+      - {node_id: 6, outputs: [{output_id: 1, gpio: 4, strip_id: strip_21, pixel_count: 10}]}
+      - {node_id: 7, outputs: [{output_id: 1, gpio: 4, strip_id: strip_31, pixel_count: 10}]}
+      - {node_id: 8, outputs: [{output_id: 1, gpio: 4, strip_id: strip_42, pixel_count: 20}]}
+      - {node_id: 9, outputs: [{output_id: 1, gpio: 4, strip_id: strip_91, pixel_count: 20}]}
+      - {node_id: 10, outputs: [{output_id: 1, gpio: 4, strip_id: strip_92, pixel_count: 20}]}
+      - {node_id: 11, outputs: [{output_id: 1, gpio: 4, strip_id: strip_43, pixel_count: 20}]}
+      - {node_id: 12, outputs: [{output_id: 1, gpio: 4, strip_id: strip_45, pixel_count: 20}]}
+      - {node_id: 13, outputs: [{output_id: 1, gpio: 4, strip_id: strip_93, pixel_count: 20}]}
   virtual_paths:
     - screen_to_top
     - screen_to_bottom_and_left
@@ -23,5 +32,5 @@ acceptance:
     trigger: strip_41
     same_frame_release: [strip_42, strip_43, strip_44, strip_45, strip_93]
   golden:
-    json_sha256: 1eecdd68b7aa30cd344f20098dccac1cf584862c322babc2db22dfa581701d42
+    json_sha256: ff764f8efa49f30f42f41b6e5474572f126ad20be64735a1ab44a2c2bcc55ebf
   deterministic_replay_sha256: fe47009b7e6060b9840b3eb29f486dcde4070a73eb110f07d23485bb2e32052f

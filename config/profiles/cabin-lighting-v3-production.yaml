@@ -1,5 +1,6 @@
-# Cabin Lighting v3 production topology.  Node hosts are documentation-only
-# placeholders until installation assigns addresses.  NOT HARDWARE VERIFIED.
+# Cabin Lighting v3 production topology. Each WS2811 strip has one ESP32 and
+# one GPIO4 output. Node hosts are documentation-only placeholders until
+# installation assigns addresses. NOT HARDWARE VERIFIED.
 # Logical strip IDs, installation numbers, ESP32 node IDs and GPIO numbers are
 # intentionally separate values.
 
@@ -16,9 +17,21 @@ outputs:
   udp_v3:
     enabled: true
     protocol_version: 3
+    presentation:
+      mode: "scheduled"
+      lead_us: 20000
+      session_start_repeats: 3
+      session_start_spacing_us: 2000
+      beacon:
+        host: "192.0.2.255"
+        port: 9001
+        interval_us: 500000
+        startup_count: 5
+        startup_spacing_us: 10000
 
 layout:
   topology_version: 3
+  digital_output_policy: "one_output_gpio4"
   total_strips: 13
   zones:
     - id: "zone_32"
@@ -48,26 +61,34 @@ layout:
     - {id: "strip_92", type: digital, pixel_count: 20, video_zone: top, direction: forward}
     - {id: "strip_93", type: digital, pixel_count: 20, video_zone: right, direction: forward}
   digital_nodes:
-    - {node_id: 1, host: "192.0.2.1", port: 9001, pixel_count: 30, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 2, host: "192.0.2.2", port: 9001, pixel_count: 50, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 3, host: "192.0.2.3", port: 9001, pixel_count: 60, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 4, host: "192.0.2.4", port: 9001, pixel_count: 80, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 1, host: "192.0.2.1", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 2, host: "192.0.2.2", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 3, host: "192.0.2.3", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 4, host: "192.0.2.4", port: 9001, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
     - {node_id: 5, host: "192.0.2.5", port: 9001, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 6, host: "192.0.2.6", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 7, host: "192.0.2.7", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 8, host: "192.0.2.8", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 9, host: "192.0.2.9", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 10, host: "192.0.2.10", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 11, host: "192.0.2.11", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 12, host: "192.0.2.12", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 13, host: "192.0.2.13", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
   digital_segments: []
   digital_outputs:
     - {node_id: 1, output_id: 1, gpio: 4, strip_id: "strip_11", pixel_count: 10, direction: forward}
-    - {node_id: 1, output_id: 2, gpio: 5, strip_id: "strip_21", pixel_count: 10, direction: forward}
-    - {node_id: 1, output_id: 3, gpio: 6, strip_id: "strip_31", pixel_count: 10, direction: forward}
     - {node_id: 2, output_id: 1, gpio: 4, strip_id: "strip_41", pixel_count: 10, direction: forward}
-    - {node_id: 2, output_id: 2, gpio: 5, strip_id: "strip_42", pixel_count: 20, direction: forward}
-    - {node_id: 2, output_id: 3, gpio: 6, strip_id: "strip_43", pixel_count: 20, direction: forward}
     - {node_id: 3, output_id: 1, gpio: 4, strip_id: "strip_44", pixel_count: 20, direction: forward}
-    - {node_id: 3, output_id: 2, gpio: 5, strip_id: "strip_45", pixel_count: 20, direction: forward}
-    - {node_id: 3, output_id: 3, gpio: 6, strip_id: "strip_93", pixel_count: 20, direction: forward}
     - {node_id: 4, output_id: 1, gpio: 4, strip_id: "strip_12", pixel_count: 40, direction: forward}
-    - {node_id: 4, output_id: 2, gpio: 5, strip_id: "strip_91", pixel_count: 20, direction: forward}
-    - {node_id: 4, output_id: 3, gpio: 6, strip_id: "strip_92", pixel_count: 20, direction: forward}
     - {node_id: 5, output_id: 1, gpio: 4, strip_id: "strip_22", pixel_count: 40, direction: forward}
+    - {node_id: 6, output_id: 1, gpio: 4, strip_id: "strip_21", pixel_count: 10, direction: forward}
+    - {node_id: 7, output_id: 1, gpio: 4, strip_id: "strip_31", pixel_count: 10, direction: forward}
+    - {node_id: 8, output_id: 1, gpio: 4, strip_id: "strip_42", pixel_count: 20, direction: forward}
+    - {node_id: 9, output_id: 1, gpio: 4, strip_id: "strip_91", pixel_count: 20, direction: forward}
+    - {node_id: 10, output_id: 1, gpio: 4, strip_id: "strip_92", pixel_count: 20, direction: forward}
+    - {node_id: 11, output_id: 1, gpio: 4, strip_id: "strip_43", pixel_count: 20, direction: forward}
+    - {node_id: 12, output_id: 1, gpio: 4, strip_id: "strip_45", pixel_count: 20, direction: forward}
+    - {node_id: 13, output_id: 1, gpio: 4, strip_id: "strip_93", pixel_count: 20, direction: forward}
   # Show v2 owns the cabin's mixed analog/digital virtual paths.  Do not
   # duplicate them here using the legacy layout-only digital path schema.
   # Keeping this empty also makes duplicate path IDs impossible at load time.

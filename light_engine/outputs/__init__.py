@@ -162,6 +162,22 @@ def create_outputs(config: Any) -> dict[str, LightOutput]:
     """
     outputs: dict[str, LightOutput] = {}
     enabled = config.get("outputs.enabled", ["simulator", "json"])
+    known_outputs = {
+        "null",
+        "json",
+        "simulator",
+        "udp_v2",
+        "udp_v3",
+        "rs485_v2",
+    }
+    unknown_outputs = set(enabled) - known_outputs - {"serial", "udp"}
+    if unknown_outputs:
+        names = ", ".join(sorted(unknown_outputs))
+        raise ValueError(f"Unknown outputs.enabled entries: {names}")
+    if not enabled:
+        raise ValueError("outputs.enabled must select at least one output")
+    if len(enabled) != len(set(enabled)):
+        raise ValueError("outputs.enabled entries must be unique")
     mode = OutputMode.from_config(config.get("outputs.mode", OutputMode.MEMORY.value))
     legacy_enabled = {"serial", "udp"} & set(enabled)
     if legacy_enabled:
@@ -183,7 +199,41 @@ def create_outputs(config: Any) -> dict[str, LightOutput]:
     if "udp_v2" in enabled:
         outputs["udp_v2"] = UdpOutputV2(mode=mode)
     if "udp_v3" in enabled:
-        outputs["udp_v3"] = UdpOutputV3(mode=mode)
+        presentation_mode = config.get(
+            "outputs.udp_v3.presentation.mode", "immediate"
+        )
+        beacon_host = config.get(
+            "outputs.udp_v3.presentation.beacon.host", "255.255.255.255"
+        )
+        beacon_port = config.get(
+            "outputs.udp_v3.presentation.beacon.port", 9001
+        )
+        digital_nodes = config.get("layout.digital_nodes", [])
+        beacon_addresses = tuple(
+            (node["host"], beacon_port) for node in digital_nodes
+        )
+        outputs["udp_v3"] = UdpOutputV3(
+            mode=mode,
+            scheduled_apply=presentation_mode == "scheduled",
+            lead_us=config.get("outputs.udp_v3.presentation.lead_us", 20_000),
+            session_start_repeats=config.get(
+                "outputs.udp_v3.presentation.session_start_repeats", 3
+            ),
+            session_start_spacing_us=config.get(
+                "outputs.udp_v3.presentation.session_start_spacing_us", 2_000
+            ),
+            beacon_address=(beacon_host, beacon_port),
+            beacon_addresses=beacon_addresses or None,
+            beacon_interval_us=config.get(
+                "outputs.udp_v3.presentation.beacon.interval_us", 500_000
+            ),
+            startup_beacons=config.get(
+                "outputs.udp_v3.presentation.beacon.startup_count", 5
+            ),
+            startup_beacon_spacing_us=config.get(
+                "outputs.udp_v3.presentation.beacon.startup_spacing_us", 10_000
+            ),
+        )
     if "rs485_v2" in enabled:
         outputs["rs485_v2"] = SerialOutputV2(
             mode=mode,
@@ -191,11 +241,14 @@ def create_outputs(config: Any) -> dict[str, LightOutput]:
             baudrate=config.get("outputs.serial.baudrate", 115200),
         )
 
+    if not outputs:
+        raise ValueError("outputs.enabled did not create any output backends")
     return outputs
 
 
 def open_all(outputs: dict[str, LightOutput]) -> None:
-    """Open all outputs, isolating failures except strict production transports."""
+    """Open outputs and roll back this batch after a production failure."""
+    opened: list[tuple[str, LightOutput]] = []
     for name, output in outputs.items():
         try:
             output.open()
@@ -203,21 +256,33 @@ def open_all(outputs: dict[str, LightOutput]) -> None:
             output.health().healthy = False
             output.health().last_error = str(e)
             if getattr(output, "mode", None) is OutputMode.PRODUCTION:
+                for opened_name, opened_output in reversed(opened):
+                    try:
+                        opened_output.close()
+                    except Exception as close_error:
+                        logger.error(
+                            "output %s rollback close failed: %s",
+                            opened_name,
+                            close_error,
+                        )
                 raise
+        else:
+            opened.append((name, output))
 
 
 def send_all(outputs: dict[str, LightOutput], frame: PhysicalFrame) -> None:
     """Send a physical frame to all open outputs.
 
     Every send failure marks the output unhealthy and is available through the
-    health summary.  Production failures are additionally emitted as errors;
-    they never change transport mode or manufacture a successful delivery.
-    Initialization failures remain strict in :func:`open_all`.
+    health summary. Production failures are re-raised immediately so a show
+    cannot continue and report success after physical delivery has stopped.
+    They never change transport mode or manufacture a successful delivery.
     """
+    safe_state = frame.metadata.get("SAFE_STATE") is True
     for name, output in outputs.items():
         health = output.health()
         health.logical_frames_submitted += 1
-        if not health.healthy:
+        if not health.healthy and not safe_state:
             continue
         try:
             output.send_frame(frame)
@@ -226,6 +291,8 @@ def send_all(outputs: dict[str, LightOutput], frame: PhysicalFrame) -> None:
             health.last_error = str(e)
             if getattr(output, "mode", None) is OutputMode.PRODUCTION:
                 logger.error("production output %s failed: %s", name, e)
+                if not safe_state:
+                    raise
 
 
 def health_summary(outputs: dict[str, LightOutput]) -> dict[str, Any]:

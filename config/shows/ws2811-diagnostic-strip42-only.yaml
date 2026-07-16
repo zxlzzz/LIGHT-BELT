@@ -1,0 +1,19 @@
+# Hardware diagnostic: node 8 / strip 42 only. Strip 41 remains black.
+schema_version: 2
+
+show:
+  id: "ws2811-diagnostic-strip42-only"
+  duration: 10.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+  cues:
+    - id: "strip42-static-blue"
+      start: 0.0
+      end: 10.0
+      target: {type: "digital_strip", id: "strip_42"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.10, 0.20, 0.65]}

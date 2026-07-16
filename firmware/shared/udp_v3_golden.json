@@ -15,6 +15,19 @@
         {"output_id": 2, "gpio": 5, "pixels": [[254, 128, 0]]}
       ],
       "encoded_hex": "4c450301020201020304000000000012d6870000000000000000020015010400020006010203040506020500010003fe800046c27364"
+    },
+    {
+      "name": "node_8_scheduled_single_output",
+      "message_type": 1,
+      "digital_node_id": 8,
+      "flags": 6,
+      "sequence": 1,
+      "media_timestamp_us": 33333,
+      "apply_at_us": 987654321,
+      "outputs": [
+        {"output_id": 1, "gpio": 4, "pixels": [[17, 34, 51]]}
+      ],
+      "encoded_hex": "4c4503010806000000010000000000008235000000003ade68b101000901040001000311223306fd922c"
     }
   ]
 }

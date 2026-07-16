@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from light_engine.clock import Clock
 from light_engine.config import Config
 import light_engine.engine as engine_module
 from light_engine.engine import Engine
@@ -51,25 +52,58 @@ class RecordingOutput(NullOutput):
         self.frames.append(frame)
 
 
+class SessionRecordingOutput(RecordingOutput):
+    def __init__(self):
+        super().__init__()
+        self.open_calls = 0
+        self.close_calls = 0
+
+    def open(self):
+        self.open_calls += 1
+        super().open()
+
+    def send_frame(self, frame):
+        if not self.is_open():
+            raise RuntimeError("recording output is closed")
+        super().send_frame(frame)
+
+    def close(self):
+        self.close_calls += 1
+        super().close()
+
+
+class ScriptedClock(Clock):
+    def __init__(self, times):
+        self._times = list(times)
+        self._time = self._times[0] if self._times else 0.0
+
+    def now(self):
+        return self._time
+
+    def tick(self):
+        previous = self._time
+        if self._times:
+            self._time = self._times.pop(0)
+        return max(0.0, self._time - previous)
+
+
 class TestFrameSequence:
-    def test_production_restarts_use_newer_wall_clock_sequence_seeds(self, monkeypatch):
+    @pytest.mark.parametrize("mode", ["memory", "production"])
+    def test_default_host_session_starts_at_sequence_one(self, mode):
         Config.reset()
         config = Config()
-        config._data["outputs"]["mode"] = "production"
-        seed_ms = 1_000_000
-        times = iter((seed_ms * 1_000_000, (seed_ms + 20_000) * 1_000_000))
-        monkeypatch.setattr(engine_module.time, "time_ns", lambda: next(times))
+        config._data["outputs"]["mode"] = mode
+        engine = Engine(config)
+        engine.use_synthetic(seed=42)
+        engine.set_effect("static")
+        output = RecordingOutput()
+        output.open()
+        engine._outputs = {"recording": output}
 
-        first = Engine(config)
-        first.use_synthetic(seed=42)
-        first.set_effect("static")
-        first_output = RecordingOutput()
-        first_output.open()
-        first._outputs = {"recording": first_output}
-        first.run(max_frames=5)
+        engine.run(max_frames=1)
 
-        second = Engine(config)
-        assert second._sequence > first_output.frames[-1].sequence
+        assert [frame.sequence for frame in output.frames] == [1, 2]
+        assert output.frames[-1].metadata["SAFE_STATE"] is True
 
     def test_engine_sequence_wraps_as_uint32(self):
         Config.reset()
@@ -84,6 +118,69 @@ class TestFrameSequence:
         engine.run(max_frames=1)
 
         assert [frame.sequence for frame in output.frames] == [0, 1]
+
+        engine.run(max_frames=1)
+
+        assert [frame.sequence for frame in output.frames] == [0, 1, 0, 1]
+
+    def test_same_engine_reopens_outputs_and_starts_each_run_from_one(self):
+        Config.reset()
+        engine = Engine(Config())
+        engine.use_synthetic(seed=42)
+        engine.set_effect("static")
+        output = SessionRecordingOutput()
+        output.open()
+        engine._outputs = {"recording": output}
+
+        engine.run(max_frames=2)
+        assert output.is_open() is False
+        assert engine.frame_count == 2
+
+        engine.run(max_frames=2)
+
+        authored = [
+            frame.sequence
+            for frame in output.frames
+            if not frame.metadata.get("SAFE_STATE")
+        ]
+        safe = [
+            frame.sequence
+            for frame in output.frames
+            if frame.metadata.get("SAFE_STATE")
+        ]
+        assert authored == [1, 2, 1, 2]
+        assert safe == [3, 3]
+        assert output.open_calls == 2
+        assert output.close_calls == 2
+        assert output.is_open() is False
+        assert engine.frame_count == 2
+
+    def test_same_engine_duration_run_resets_engine_owned_offline_clock(self):
+        Config.reset()
+        engine = Engine(Config())
+        engine.use_synthetic(seed=42)
+        engine.set_effect("static")
+        output = SessionRecordingOutput()
+        output.open()
+        engine._outputs = {"recording": output}
+
+        engine.run(duration=0.1)
+        first_authored = [
+            (frame.sequence, frame.timestamp)
+            for frame in output.frames
+            if not frame.metadata.get("SAFE_STATE")
+        ]
+        first_end = len(output.frames)
+
+        engine.run(duration=0.1)
+        second_authored = [
+            (frame.sequence, frame.timestamp)
+            for frame in output.frames[first_end:]
+            if not frame.metadata.get("SAFE_STATE")
+        ]
+
+        assert first_authored == second_authored
+        assert first_authored
 
     def test_engine_reads_final_output_transform_configuration(self):
         Config.reset()
@@ -119,6 +216,22 @@ class TestFrameSequence:
 
         assert [frame.sequence for frame in output.frames] == [1, 2, 3, 4, 5, 6]
         assert output.frames[-1].metadata["SAFE_STATE"] is True
+
+    def test_exit_safe_state_configuration_can_explicitly_disable_shutdown_frame(self):
+        Config.reset()
+        config = Config()
+        config._data["outputs"]["exit_safe_state"] = False
+        engine = Engine(config)
+        engine.use_synthetic(seed=42)
+        engine.set_effect("static")
+        output = RecordingOutput()
+        output.open()
+        engine._outputs = {"recording": output}
+
+        engine.run(max_frames=1)
+
+        assert [frame.sequence for frame in output.frames] == [1]
+        assert all(not frame.metadata.get("SAFE_STATE") for frame in output.frames)
 
     def test_engine_sends_physical_frame_to_output(self, monkeypatch):
         captured = []
@@ -253,6 +366,35 @@ class TestSyntheticSource:
         engine._output_fps = 300.0
         engine.run(max_frames=200)
         assert engine.frame_count == 200
+
+    @staticmethod
+    def _engine_at(times):
+        Config.reset()
+        engine = Engine(Config(), clock=ScriptedClock(times))
+        engine.use_synthetic(seed=42)
+        engine.set_effect("static")
+        output = RecordingOutput()
+        output.open()
+        engine._outputs = {"recording": output}
+        return engine, output
+
+    def test_explicit_duration_outlives_synthetic_fixture(self, monkeypatch):
+        monkeypatch.setattr(engine_module.time, "sleep", lambda _seconds: None)
+        engine, output = self._engine_at([119.9, 120.0, 299.9, 300.0])
+
+        engine.run(duration=300.0)
+
+        authored = [frame for frame in output.frames if not frame.metadata.get("SAFE_STATE")]
+        assert [frame.timestamp for frame in authored] == [119.9, 120.0, 299.9]
+
+    def test_synthetic_fixture_still_ends_naturally_without_duration(self, monkeypatch):
+        monkeypatch.setattr(engine_module.time, "sleep", lambda _seconds: None)
+        engine, output = self._engine_at([119.9, 120.0])
+
+        engine.run()
+
+        authored = [frame for frame in output.frames if not frame.metadata.get("SAFE_STATE")]
+        assert [frame.timestamp for frame in authored] == [119.9]
 
 
 class TestAudioOnlyStop:

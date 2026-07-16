@@ -38,13 +38,6 @@ logger = logging.getLogger(__name__)
 _SEQUENCE_MODULUS = 1 << 32
 
 
-def _initial_sequence(config: Config) -> int:
-    """Choose a restart-safe seed for live hardware without affecting offline determinism."""
-    if config.get("outputs.mode", "memory") != "production":
-        return 0
-    return (time.time_ns() // 1_000_000) % _SEQUENCE_MODULUS
-
-
 class Engine:
     """Main lighting engine orchestrating analysis, effects, and output."""
 
@@ -103,9 +96,10 @@ class Engine:
         self._last_clock_time: float = self._clock.now()
         self._frame_count: int = 0
         if sequence_seed is None:
-            sequence_seed = _initial_sequence(config)
+            sequence_seed = 0
         if not isinstance(sequence_seed, int) or not 0 <= sequence_seed < _SEQUENCE_MODULUS:
             raise ValueError("sequence_seed must be a uint32")
+        self._sequence_seed: int = sequence_seed
         self._sequence: int = sequence_seed
         self._fps_stats: list[float] = []
         self._run_start_wall: float = 0.0
@@ -190,6 +184,31 @@ class Engine:
         self._outputs = create_outputs(self._config)
         open_all(self._outputs)
 
+    def _begin_run_session(self) -> None:
+        """Reset Engine-owned state and reopen outputs for one Host session."""
+        if isinstance(self._clock, OfflineRenderClock):
+            self._clock.reset()
+        self._handle_timeline_reset()
+        self._timestamp = self._clock.now()
+        self._last_clock_time = self._timestamp
+        self._sequence = self._sequence_seed
+        self._frame_count = 0
+        self._fps_stats.clear()
+        self._run_start_wall = 0.0
+        self._run_end_wall = 0.0
+        self._diagnostics["last_error"] = None
+
+        if not self._outputs:
+            self.init_outputs()
+            return
+        closed_outputs = {
+            name: output
+            for name, output in self._outputs.items()
+            if not output.is_open()
+        }
+        if closed_outputs:
+            open_all(closed_outputs)
+
     # ---- Main loop ----
 
     def run(
@@ -206,8 +225,7 @@ class Engine:
         if self._effect is None and self._show_runtime is None:
             self.set_effect(self._config.get("effects.active", "demo"))
 
-        if not self._outputs:
-            self.init_outputs()
+        self._begin_run_session()
 
         self._running = True
         self._diagnostics["running"] = True
@@ -217,6 +235,12 @@ class Engine:
         frame_period = 1.0 / self._output_fps
         video_period = 1.0 / self._video_fps if self._video_fps > 0 else 0.1
         audio_period = 1.0 / self._audio_fps if self._audio_fps > 0 else 0.016
+        explicit_duration_owns_synthetic_end = (
+            duration is not None
+            and isinstance(self._data_source, SyntheticDataSource)
+            and self._video_reader is None
+            and self._audio_reader is None
+        )
 
         last_video_time = -video_period
         last_audio_time = -audio_period
@@ -265,9 +289,13 @@ class Engine:
                     else True
                 )
                 data_finished = (
-                    self._timestamp >= self._data_source.duration()
-                    if self._data_source is not None
-                    else True
+                    False
+                    if explicit_duration_owns_synthetic_end
+                    else (
+                        self._timestamp >= self._data_source.duration()
+                        if self._data_source is not None
+                        else True
+                    )
                 )
 
                 has_any_media = (
@@ -408,15 +436,16 @@ class Engine:
         self._running = False
         self._run_end_wall = time.perf_counter()
         try:
-            self._advance_sequence()
-            safe_frame = OutputTransform.generate_safe_frame(
-                timestamp=self._timestamp,
-                sequence=self._sequence,
-                zone_ids=[zone["id"] for zone in self._zone_defs],
-                strips=self._strip_defs,
-            )
-            physical_safe_frame = self._physical_mapping.map(safe_frame)
-            send_all(self._outputs, physical_safe_frame)
+            if self._config.get("outputs.exit_safe_state", True):
+                self._advance_sequence()
+                safe_frame = OutputTransform.generate_safe_frame(
+                    timestamp=self._timestamp,
+                    sequence=self._sequence,
+                    zone_ids=[zone["id"] for zone in self._zone_defs],
+                    strips=self._strip_defs,
+                )
+                physical_safe_frame = self._physical_mapping.map(safe_frame)
+                send_all(self._outputs, physical_safe_frame)
         except Exception as e:
             logger.exception("Failed to send shutdown safe frame")
             self._diagnostics["last_error"] = str(e)

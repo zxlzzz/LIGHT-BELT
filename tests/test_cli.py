@@ -30,10 +30,10 @@ def test_cabin_show_inspection_traces_all_fourteen_fixtures() -> None:
         "strip_91", "strip_92", "strip_93",
     }
     strip_42 = next(region for region in regions if region["logical_id"] == "strip_42")
-    assert strip_42["node_id"] == 2
-    assert strip_42["output_id"] == 2
-    assert strip_42["gpio"] == 5
-    assert strip_42["host"] == "192.0.2.2"
+    assert strip_42["node_id"] == 8
+    assert strip_42["output_id"] == 1
+    assert strip_42["gpio"] == 4
+    assert strip_42["host"] == "192.0.2.8"
     assert strip_42["port"] == 9001
     assert strip_42["transport_enabled"] is True
     cob = next(region for region in regions if region["logical_id"] == "zone_32")

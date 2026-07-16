@@ -46,6 +46,10 @@ outputs:
   udp_v3:
     enabled: false
     protocol_version: 3
+    # Diagnostics and in-memory tests remain immediate unless a production
+    # one-ESP32-per-strip profile explicitly requires scheduled presentation.
+    presentation:
+      mode: "immediate"
 
   # RS-485 v2 output (for STM32 analog RGB+CCT nodes)
   rs485_v2:

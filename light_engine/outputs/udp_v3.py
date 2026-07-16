@@ -7,8 +7,16 @@ Wire order is big-endian and deliberately self-describing::
     repeated (output_id:u8 gpio:u8 pixel_count:u16 output_length:u16 payload)
     crc32:u32
 
-``apply_at_us == 0`` means not scheduled in the initial release.  The codec
-contains no sockets, clocks, GPIO drivers, or mutable sequence state.
+``apply_at_us == 0`` means immediate application.  A non-zero value is valid
+only when ``SCHEDULED_APPLY`` is set, so old immediate frames remain
+unambiguous.  The codec contains no sockets, clocks, GPIO drivers, or mutable
+sequence state.
+The transport marks sequence 1 of a newly opened Host output as `KEY_FRAME`;
+stateful firmware, not this pure codec, owns the exact session-reset rule.
+
+Clock synchronization uses a separate, broadcast-safe fixed-length message::
+
+    magic:u16 version:u8 type:u8 sequence:u32 host_monotonic_us:u64 crc32:u32
 """
 
 from __future__ import annotations
@@ -18,7 +26,6 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Sequence
 
 from light_engine.outputs.udp_v2 import (
-    ALLOWED_FLAGS,
     CRC_LENGTH,
     FLAG_KEY_FRAME,
     FLAG_SAFE_STATE,
@@ -32,10 +39,16 @@ from light_engine.outputs.udp_v2 import (
 MAGIC = 0x4C45
 VERSION = 0x03
 MESSAGE_TYPE_FRAME = 0x01
+MESSAGE_TYPE_CLOCK_BEACON = 0x02
+FLAG_SCHEDULED_APPLY = 0x04
+ALLOWED_FLAGS = FLAG_SAFE_STATE | FLAG_KEY_FRAME | FLAG_SCHEDULED_APPLY
 HEADER_FORMAT = ">HBBBBIQQBH"
 HEADER_LENGTH = struct.calcsize(HEADER_FORMAT)
 OUTPUT_FORMAT = ">BBHH"
 OUTPUT_LENGTH = struct.calcsize(OUTPUT_FORMAT)
+CLOCK_BEACON_FORMAT = ">HBBIQ"
+CLOCK_BEACON_BODY_LENGTH = struct.calcsize(CLOCK_BEACON_FORMAT)
+CLOCK_BEACON_LENGTH = CLOCK_BEACON_BODY_LENGTH + CRC_LENGTH
 MAX_UINT64 = 0xFFFFFFFFFFFFFFFF
 MAX_UDP_PAYLOAD = 65507
 
@@ -96,9 +109,16 @@ class UdpV3Packet:
         _require_uint("media_timestamp_us", self.media_timestamp_us, MAX_UINT64)
         if self.apply_at_us is not None:
             _require_uint("apply_at_us", self.apply_at_us, MAX_UINT64)
+            if self.apply_at_us == 0:
+                raise ValueError("apply_at_us must be non-zero when scheduled")
         _require_uint("flags", self.flags, MAX_UINT8)
         if self.flags & ~ALLOWED_FLAGS:
             raise ValueError(f"reserved flags must be zero, got 0x{self.flags:02X}")
+        is_scheduled = bool(self.flags & FLAG_SCHEDULED_APPLY)
+        if is_scheduled != (self.apply_at_us is not None):
+            raise ValueError(
+                "FLAG_SCHEDULED_APPLY and apply_at_us must be present together"
+            )
         _require_uint("message_type", self.message_type, MAX_UINT8)
         if self.message_type != MESSAGE_TYPE_FRAME:
             raise ValueError(f"unsupported message_type {self.message_type!r}")
@@ -159,6 +179,8 @@ class UdpV3Packet:
             or message_type != MESSAGE_TYPE_FRAME
             or flags & ~ALLOWED_FLAGS
         ):
+            return None
+        if bool(flags & FLAG_SCHEDULED_APPLY) != (apply_at_raw != 0):
             return None
         if output_count == 0 or output_count > 3:
             return None
@@ -225,7 +247,63 @@ class UdpV3Packet:
             return None
 
 
+@dataclass(frozen=True)
+class UdpV3ClockBeacon:
+    """One Host-clock sample that can be sent to every node unchanged."""
+
+    sequence: int
+    host_monotonic_us: int
+    message_type: int = MESSAGE_TYPE_CLOCK_BEACON
+
+    def __post_init__(self) -> None:
+        _require_uint("sequence", self.sequence, MAX_UINT32)
+        _require_uint("host_monotonic_us", self.host_monotonic_us, MAX_UINT64)
+        _require_uint("message_type", self.message_type, MAX_UINT8)
+        if self.message_type != MESSAGE_TYPE_CLOCK_BEACON:
+            raise ValueError(f"unsupported message_type {self.message_type!r}")
+
+    def encode(self) -> bytes:
+        body = struct.pack(
+            CLOCK_BEACON_FORMAT,
+            MAGIC,
+            VERSION,
+            self.message_type,
+            self.sequence,
+            self.host_monotonic_us,
+        )
+        return body + struct.pack(">I", crc32(body))
+
+    @classmethod
+    def decode(cls, data: bytes) -> Optional["UdpV3ClockBeacon"]:
+        if len(data) != CLOCK_BEACON_LENGTH:
+            return None
+        try:
+            magic, version, message_type, sequence, host_monotonic_us = struct.unpack(
+                CLOCK_BEACON_FORMAT, data[:CLOCK_BEACON_BODY_LENGTH]
+            )
+            expected_crc = struct.unpack(">I", data[-CRC_LENGTH:])[0]
+        except struct.error:
+            return None
+        if (
+            magic != MAGIC
+            or version != VERSION
+            or message_type != MESSAGE_TYPE_CLOCK_BEACON
+            or crc32(data[:-CRC_LENGTH]) != expected_crc
+        ):
+            return None
+        try:
+            return cls(
+                sequence=sequence,
+                host_monotonic_us=host_monotonic_us,
+                message_type=message_type,
+            )
+        except ValueError:
+            return None
+
+
 __all__ = [
-    "FLAG_KEY_FRAME", "FLAG_SAFE_STATE", "HEADER_LENGTH", "MAGIC", "VERSION",
-    "UdpV3Output", "UdpV3Packet",
+    "CLOCK_BEACON_LENGTH", "FLAG_KEY_FRAME", "FLAG_SAFE_STATE",
+    "FLAG_SCHEDULED_APPLY", "HEADER_LENGTH", "MAGIC",
+    "MESSAGE_TYPE_CLOCK_BEACON", "MESSAGE_TYPE_FRAME", "VERSION",
+    "UdpV3ClockBeacon", "UdpV3Output", "UdpV3Packet",
 ]

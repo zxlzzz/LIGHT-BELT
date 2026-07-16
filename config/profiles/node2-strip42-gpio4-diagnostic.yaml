@@ -1,0 +1,64 @@
+# Strip 42 A/B profile: one 20-group UDP v3 output on the proven GPIO4 lane.
+# NOT HARDWARE VERIFIED.
+
+outputs:
+  mode: "production"
+  enabled: ["udp_v3"]
+  exit_safe_state: true
+  udp_v3:
+    enabled: true
+    protocol_version: 3
+    presentation:
+      mode: "immediate"
+  rs485_v2:
+    enabled: false
+
+system:
+  platform: "windows"
+  output_fps: 30.0
+  clock:
+    mode: "internal"
+  smoothing:
+    max_brightness: 0.65
+    gamma: 1.30
+
+layout:
+  topology_version: 3
+  digital_output_policy: "multi_output_diagnostic"
+  total_strips: 1
+  zones:
+    - {id: "zone_32", type: rgbcct, label: "disabled_analog_placeholder", video_zone: left, direction: forward}
+  analog_nodes:
+    - node_id: 17
+      zone_id: "zone_32"
+      video_zone: left
+      channel_order: "RGBWC"
+      fade_ms: 0
+  strips:
+    - {id: "strip_42", type: digital, pixel_count: 20, video_zone: right, direction: forward}
+  digital_nodes:
+    - {node_id: 2, host: "192.168.31.202", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+  digital_segments: []
+  digital_outputs:
+    - {node_id: 2, output_id: 1, gpio: 4, strip_id: "strip_42", pixel_count: 20, direction: forward}
+  virtual_paths:
+    - id: "strip42_first_10"
+      segments:
+        - strip_id: "strip_42"
+          source_start: 0
+          pixel_count: 10
+          direction: "forward"
+          gap_after_pixels: 0
+    - id: "strip42_last_10"
+      segments:
+        - strip_id: "strip_42"
+          source_start: 10
+          pixel_count: 10
+          direction: "forward"
+          gap_after_pixels: 0
+  video_zone_map:
+    left: ["zone_32"]
+    right: ["strip_42"]
+    top: []
+    bottom: []
+    center: []

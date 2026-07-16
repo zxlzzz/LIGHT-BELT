@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from light_engine.mapping.physical import (
     AnalogNodeCommand,
     DigitalNodeFrame,
@@ -116,11 +118,12 @@ def test_rs485_packets_for_one_frame_are_contiguous() -> None:
     assert {packet.sequence for packet in packets if packet is not None} == {1}
 
 
-def test_udp_failure_isolated_and_counted() -> None:
+def test_production_udp_failure_is_reraised_and_counted() -> None:
     output = UdpOutputV2(mode=OutputMode.PRODUCTION, socket=FailingSocket())
     output.open()
 
-    send_all({"udp_v2": output}, _physical_frame())
+    with pytest.raises(OSError, match="send failed"):
+        send_all({"udp_v2": output}, _physical_frame())
 
     health = output.health()
     assert health.healthy is False

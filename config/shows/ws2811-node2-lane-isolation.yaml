@@ -1,0 +1,28 @@
+# Legacy multi-output Node 2 diagnostic, not a production one-ESP-per-strip show.
+# Black gaps and white payloads avoid RGB/GRB ambiguity.
+schema_version: 2
+
+show:
+  id: "ws2811-node2-lane-isolation"
+  duration: 17.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "gpio4-strip41-white"
+      start: 2.0
+      end: 7.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [1.0, 1.0, 1.0]}
+
+    - id: "gpio5-strip42-white"
+      start: 9.0
+      end: 14.0
+      target: {type: "digital_strip", id: "strip_42"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [1.0, 1.0, 1.0]}

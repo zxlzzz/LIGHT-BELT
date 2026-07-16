@@ -1,29 +1,11 @@
 #ifndef LIGHT_BELT_ESP32_NODE_3_H
 #define LIGHT_BELT_ESP32_NODE_3_H
 
-#undef NODE_ID
-#undef OUTPUT_COUNT
-#undef OUTPUT_0_ID
-#undef OUTPUT_0_GPIO
-#undef OUTPUT_0_PIXELS
-#undef OUTPUT_1_ID
-#undef OUTPUT_1_GPIO
-#undef OUTPUT_1_PIXELS
-#undef OUTPUT_2_ID
-#undef OUTPUT_2_GPIO
-#undef OUTPUT_2_PIXELS
-
-// Reserved future controller for strip_44, strip_45, and strip_93.
 #define NODE_ID 3
-#define OUTPUT_COUNT 3
+#define NODE_IPV4_D 203
+#define OUTPUT_COUNT 1
 #define OUTPUT_0_ID 1
 #define OUTPUT_0_GPIO 4
 #define OUTPUT_0_PIXELS 20
-#define OUTPUT_1_ID 2
-#define OUTPUT_1_GPIO 5
-#define OUTPUT_1_PIXELS 20
-#define OUTPUT_2_ID 3
-#define OUTPUT_2_GPIO 6
-#define OUTPUT_2_PIXELS 20
 
 #endif
