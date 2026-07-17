@@ -44,7 +44,7 @@ size_t ws2811Spi6FrameSize(uint16_t group_count) {
   if (group_count == 0 || group_count > MAX_PIXELS_PER_OUTPUT) {
     return 0;
   }
-  return 2U * WS2811_SPI6_GUARD_BYTES +
+  return WS2811_SPI6_PRE_GUARD_BYTES + WS2811_SPI6_POST_GUARD_BYTES +
          static_cast<size_t>(group_count) * WS2811_SPI6_BYTES_PER_GROUP;
 }
 
@@ -63,7 +63,7 @@ bool encodeWs2811Spi6(
   }
 
   memset(destination, 0, required);
-  size_t cursor = WS2811_SPI6_GUARD_BYTES;
+  size_t cursor = WS2811_SPI6_PRE_GUARD_BYTES;
   for (uint16_t pixel = 0; pixel < group_count; ++pixel) {
     for (uint8_t channel = 0; channel < 3; ++channel) {
       encodeByte(
@@ -73,6 +73,25 @@ bool encodeWs2811Spi6(
     }
   }
   *encoded_len = required;
+  return true;
+}
+
+bool ws2811Spi6UniformEncodedGroups(
+    const uint8_t *encoded,
+    size_t encoded_len,
+    uint16_t group_count) {
+  if (encoded == nullptr ||
+      encoded_len != ws2811Spi6FrameSize(group_count)) {
+    return false;
+  }
+  const uint8_t *first = encoded + WS2811_SPI6_PRE_GUARD_BYTES;
+  for (uint16_t group = 1; group < group_count; ++group) {
+    const uint8_t *candidate =
+        first + static_cast<size_t>(group) * WS2811_SPI6_BYTES_PER_GROUP;
+    if (memcmp(first, candidate, WS2811_SPI6_BYTES_PER_GROUP) != 0) {
+      return false;
+    }
+  }
   return true;
 }
 

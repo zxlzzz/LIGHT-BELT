@@ -1,108 +1,140 @@
-# ESP32-S3 现场批量烧录操作手册（Windows）
+# ESP32-S3 一灯带一节点现场烧录手册（Windows）
 
 状态：**NOT HARDWARE VERIFIED**。
 
-本文只说明如何把当前仓库中的 ESP32-S3 固件依次烧入现场控制板，以及一块烧完后
-怎样切换到下一块。不要在这份流程中顺带修改灯带映射、GPIO、像素数、协议或现场
-拓扑。遇到不一致时停止，不要靠猜测继续烧录。
+本文用于 Phase 31 的 ESP32-S3 批量烧录与留档。生产合同是一条 WS2811
+灯带对应一块 ESP32-S3；每个节点只有 `output_id: 1`，数据引脚为 GPIO4。
+烧录成功只证明固件写入成功，不证明 Wi-Fi、UDP、灯带、电源或整场同步已经通过
+硬件验收。
 
-## 1. 本批次固定烧录清单
+所有 `esp32-s3-node-N` 生产镜像强制使用 scheduled UDP v3：Host 广播单调
+时钟 beacon，并对同一逻辑帧统一设置 20 ms 后的 `apply_at_us`。节点使用 beacon
+有界窗口中的最小 local-minus-Host offset 换算本地时钟。生产固件不会把 immediate
+frame 当作降级方案；显式 Node 2 诊断镜像才保留 immediate 行为。该软件合同已经
+实现，真实多节点锁存同步仍须上电并用逻辑分析仪验收。
 
-严格按下列顺序操作，一次只连接一块板：
+当前正式 profile 仍使用 20 ms lead、500 ms 运行 beacon 和 5 个间隔 10 ms
+的启动 beacon；这些参数尚未通过硬件门禁。Node 2 robust A/B 使用的是 60 ms
+lead、100 ms 运行 beacon 和 32 个间隔 50 ms 的启动 beacon。正式参数迁移属于
+P1 Scheduled 门禁，不得混入 Immediate/SPI6 输出验收。
 
-| 顺序 | 实物板 | 已记录 MAC | 烧入配置 | 烧后标签 |
-|---:|---|---|---|---|
-| 1 | ESP32 1 | `e0:72:a1:d3:53:34` | `node_configs/node_1.h` | `ESP32 1 / Node 1` |
-| 2 | ESP32 2 | `e0:72:a1:d3:30:3c` | `node_configs/node_2.h` | `ESP32 2 / Node 2` |
-| 3 | ESP32 4 | `e0:72:a1:d2:7e:08` | `node_configs/node_4.h` | `ESP32 4 / Node 4` |
-| 4 | ESP32 5 | `e0:72:a1:d3:08:b0` | `node_configs/node_5.h` | `ESP32 5 / Node 5` |
+每次 scheduled show 启动时，Host 必须先完成所有节点的 sequence-1 KEY 编码，
+再以相同 apply/media identity 和每节点相同 raw 连续发送三轮，轮间 2 ms。固件
+幂等去重这些副本；完成 KEY preparation 后即准入该 generation。之后若定时物理
+输出失败，固件恢复上一帧或安全黑，并允许下一张完整 scheduled frame 恢复，不能
+在 deadline 后盲目重发同一 wire transaction。
 
-Node 3 仅为未来逻辑预留，当前没有对应实物板，本批次不烧录 Node 3。
+## 1. 固定节点合同
 
-## 2. 每次开始前的硬性规则
+| Node | 逻辑灯带 | Groups | Output / GPIO | 现场 IPv4 | 当前九节点 | 已记录 MAC |
+|---:|---|---:|---|---|---|---|
+| 1 | `strip_11` | 10 | 1 / GPIO4 | `192.168.31.201` | 是 | `e0:72:a1:d3:53:34` |
+| 2 | `strip_41` | 10 | 1 / GPIO4 | `192.168.31.202` | 是 | `e0:72:a1:d3:30:3c` |
+| 3 | `strip_44` | 20 | 1 / GPIO4 | `192.168.31.203` | 否 | 待实物分配 |
+| 4 | `strip_12` | 40 | 1 / GPIO4 | `192.168.31.204` | 是 | `e0:72:a1:d2:7e:08` |
+| 5 | `strip_22` | 40 | 1 / GPIO4 | `192.168.31.205` | 是 | `e0:72:a1:d3:08:b0` |
+| 6 | `strip_21` | 10 | 1 / GPIO4 | `192.168.31.206` | 是 | 现场记录 |
+| 7 | `strip_31` | 10 | 1 / GPIO4 | `192.168.31.207` | 是 | 现场记录 |
+| 8 | `strip_42` | 20 | 1 / GPIO4 | `192.168.31.208` | 是 | 现场记录 |
+| 9 | `strip_91` | 20 | 1 / GPIO4 | `192.168.31.209` | 是 | 现场记录 |
+| 10 | `strip_92` | 20 | 1 / GPIO4 | `192.168.31.210` | 是 | 现场记录 |
+| 11 | `strip_43` | 20 | 1 / GPIO4 | `192.168.31.211` | 否 | 待实物分配 |
+| 12 | `strip_45` | 20 | 1 / GPIO4 | `192.168.31.212` | 否 | 待实物分配 |
+| 13 | `strip_93` | 20 | 1 / GPIO4 | `192.168.31.213` | 否 | 待实物分配 |
 
-1. PowerShell 当前目录必须是 `A:\BaiduNetdiskDownload\LIGHT-BELT`。
-2. 电脑上一次只连接当前要烧的那一块 ESP32。
-3. 每块板开始前都重新识别串口，不沿用上一块板的 COM 号假设。
-4. 每块板都先确认 `config.local.h` 选中了正确的 Node，再清理、构建、上传。
-5. 上一块板没有贴完标签、退出串口监视器并断开 USB 前，不连接下一块板。
-6. 看到 `SUCCESS` 只能说明对应步骤成功；构建成功不等于上传成功。
-7. 不把真实 Wi-Fi 密码写入本文、聊天、截图、提交记录或受 Git 跟踪的文件。
+当前现场批次只烧录节点 `1`、`2`、`4`、`5`、`6`、`7`、`8`、`9`、
+`10`。没有对应实物板时，不得为了凑齐完整拓扑而烧录、贴签或记录节点 `3`、`11`、
+`12`、`13`。新增实物板以后按同一流程单独完成剩余节点。
 
-## 3. 一次性准备 PowerShell 和本地配置
+## 2. 开始前的停止条件
 
-### 3.1 打开仓库根目录
+1. PowerShell 当前目录必须是仓库根目录。
+2. 一次只连接一块 ESP32；每块板都重新识别 COM 口。
+3. 实物板、Node、逻辑灯带、groups、IP 和 MAC 必须能落在同一条记录中。
+4. `config.local.h` 只保存 Wi-Fi 凭据；Node 只能由本次构建的
+   `esp32-s3-node-N` PlatformIO 环境选择。
+5. 不修改 `node_X.h` 来绕过映射、GPIO、groups 或地址不一致。
+6. 不把真实 Wi-Fi 密码写入本文、终端历史、截图或 Git 跟踪文件。
+7. 上一块板未贴签、未退出串口监视器、未断开 USB 前，不连接下一块板。
+8. 任一检查失败只处理当前板，不上传旧 `firmware.bin`，也不跳到下一块。
 
-新开一个 PowerShell 窗口，执行：
+## 3. 一次性准备
+
+打开 PowerShell：
 
 ```powershell
-Set-Location 'A:\BaiduNetdiskDownload\LIGHT-BELT'
-Get-Location
-Get-Command pio
+$Repository = (Get-Location).Path
+if (-not (Test-Path -LiteralPath `
+    (Join-Path $Repository 'config\profiles\ws2811-installed-one-esp-per-strip.yaml'))) {
+  throw '当前目录不是包含 Phase 31 改动的仓库 checkout。请先进入正确 worktree 或已集成分支。'
+}
+git branch --show-current
+git status --short --branch
+
+$Project = (Resolve-Path 'firmware\esp32_ws2811_node').Path
+$ConfigPath = Join-Path $Project 'src\config.local.h'
+$Pio = (Get-Command pio).Source
+if (-not $Pio.StartsWith('A:\', [System.StringComparison]::OrdinalIgnoreCase)) {
+  throw "PlatformIO 不在 A 盘：$Pio"
+}
+
+$env:PLATFORMIO_CORE_DIR = Join-Path $Project '.pio\core'
+$env:PLATFORMIO_PLATFORMS_DIR = Join-Path $Project '.pio\platforms'
+$env:PLATFORMIO_PACKAGES_DIR = Join-Path $Project '.pio\packages'
+$env:PLATFORMIO_CACHE_DIR = Join-Path $Project '.pio\cache'
+$env:PLATFORMIO_BUILD_CACHE_DIR = Join-Path $Project '.pio\cache\build'
+$BuildTemp = Join-Path $Project '.pio\tmp'
+New-Item -ItemType Directory -Force -Path $BuildTemp | Out-Null
+$env:TEMP = $BuildTemp
+$env:TMP = $BuildTemp
+$env:TMPDIR = $BuildTemp
+$env:PLATFORMIO_SETTING_ENABLE_TELEMETRY = 'No'
 ```
 
-`Get-Location` 必须显示本仓库；`Get-Command pio` 必须能找到 PlatformIO。任一命令报错
-都先停止，不要连接控制板开始烧录。
+`$Repository`、`$Project`、`$Pio`、PlatformIO 状态目录和临时目录必须全部
+位于 A 盘。不要让构建重新使用用户目录中的 `.platformio` 或 C 盘临时目录。
 
-### 3.2 只在文件不存在时创建本地配置
-
-先检查：
+只在本地配置不存在时创建：
 
 ```powershell
-$ConfigPath = 'firmware\esp32_ws2811_node\src\config.local.h'
-Test-Path $ConfigPath
+if (-not (Test-Path -LiteralPath $ConfigPath)) {
+  Copy-Item `
+    "$Project\src\config.local.example.h" `
+    $ConfigPath
+}
 ```
 
-如果输出 `True`，不要再执行复制命令，以免覆盖已经填写的现场密码。
-
-只有输出 `False` 时才执行：
-
-```powershell
-Copy-Item `
-  firmware\esp32_ws2811_node\src\config.local.example.h `
-  firmware\esp32_ws2811_node\src\config.local.h
-```
-
-### 3.3 填写 Wi-Fi，并先选择 Node 1
+用记事本只填写本地 Wi-Fi：
 
 ```powershell
 notepad $ConfigPath
 ```
 
-第一次烧 ESP32 1 时，文件的有效配置应为：
+示例结构：
 
 ```cpp
-#define WIFI_SSID "灵境"
-#define WIFI_PASSWORD "现场真实密码"
-
-#include "node_configs/node_1.h"
+#define WIFI_SSID "REPLACE_WITH_WIFI_SSID"
+#define WIFI_PASSWORD "REPLACE_WITH_WIFI_PASSWORD"
 ```
 
-真实密码只写在 `config.local.h`。保存并关闭记事本。不要把密码粘贴回 PowerShell，
-也不要运行会把整份配置内容打印到屏幕上的命令。
-
-用下面的检查确认占位值已经被替换，但不显示真实密码：
+不要在 `config.local.h` 中加入 `node_X.h`、`NODE_ID`、`OUTPUT_COUNT` 或
+`LIGHT_BELT_NODE_CONFIG`。密码只保存在这个未跟踪文件中。以下检查不打印密码：
 
 ```powershell
 $LocalConfig = Get-Content -LiteralPath $ConfigPath -Raw
 if ($LocalConfig -match 'REPLACE_WITH_WIFI|PLACEHOLDER_') {
   throw 'config.local.h 仍包含 Wi-Fi 占位值，停止烧录。'
 }
-Write-Host 'Wi-Fi 占位值检查通过。'
+if ($LocalConfig -match 'node_configs|NODE_ID|OUTPUT_COUNT|LIGHT_BELT_NODE_CONFIG') {
+  throw 'config.local.h 只能包含 Wi-Fi 凭据，停止烧录。'
+}
 ```
 
-## 4. 每块板共用的标准动作
+## 4. 每块板的标准动作
 
-后面四块板都重复本节动作。先设置固定变量：
+### 4.1 识别当前板
 
-```powershell
-$Project = 'firmware\esp32_ws2811_node'
-$ConfigPath = "$Project\src\config.local.h"
-```
-
-### 4.1 只连接当前板并识别串口
-
-连接当前板后执行：
+只连接当前板，然后查询串口：
 
 ```powershell
 Get-CimInstance Win32_SerialPort |
@@ -110,232 +142,252 @@ Get-CimInstance Win32_SerialPort |
   Select-Object DeviceID, Name
 ```
 
-找到当前 USB 转串口设备，把实际端口写入变量。例如本机显示 COM9 时：
+将实际端口写入 `$Port`，不要沿用上一块板的 COM 号：
 
 ```powershell
 $Port = 'COM9'
 Write-Host "本次烧录端口：$Port"
 ```
 
-COM5、COM9 等编号会随电脑变化，这是正常现象。不要因为另一台电脑曾使用 COM5，
-就在本机直接写死 COM5。
+不能确定端口时，拔下当前板查询一次，再插入并重新查询；新增端口才属于当前板。
 
-如果不能确定哪一个端口属于当前板：拔下 USB、执行一次串口查询；重新插入当前板、
-再执行一次。新增的端口才是本次应使用的端口。
+### 4.2 选择并验证 Node
 
-### 4.2 修改并核对 Node 选择
-
-打开配置：
+为当前实物板设置 Node，并由它生成唯一构建环境。下面以 Node 8 为例：
 
 ```powershell
-notepad $ConfigPath
-```
-
-只修改最后的 `#include`。SSID 和密码在整个批次中保持不变。保存并关闭记事本后，执行：
-
-```powershell
-$NodeIncludes = Get-Content -LiteralPath $ConfigPath |
-  Where-Object { $_ -match '^#include "node_configs/node_[1-5]\.h"$' }
-$NodeIncludes
-if (@($NodeIncludes).Count -ne 1) {
-  throw '必须且只能启用一个 node_X.h，停止烧录。'
+$Node = 8
+if ($Node -notin 1..13) {
+  throw "Node 必须在 1 至 13 之间：$Node"
 }
+$Environment = "esp32-s3-node-$Node"
+$EnvironmentHeader = "[env:$Environment]"
+if (-not (Select-String `
+    -LiteralPath (Join-Path $Project 'platformio.ini') `
+    -SimpleMatch $EnvironmentHeader -Quiet)) {
+  throw "platformio.ini 缺少环境：$Environment"
+}
+Write-Host "本次 Node：$Node；构建环境：$Environment；端口：$Port"
 ```
 
-屏幕只能出现一条 Node include，并且必须与当前实物板同号。
+屏幕显示的 `$Node`、`$Environment` 和 `$Port` 必须与实物标签及第 1 节的
+同一目标行一致。切换实物板时只重新设置 `$Node`、`$Environment` 和 `$Port`；
+不要修改 `config.h`、`config.local.h` 或 `node_X.h` 来选择 Node。
 
-### 4.3 清理上一块板的构建产物
+### 4.3 Clean、构建和上传
 
-切换 Node 后必须清理，避免把上一块板生成的固件误传给下一块板：
+每次切换 Node 都执行 clean：
 
 ```powershell
-pio run -d $Project -e esp32-s3-devkitc-1 -t clean
+pio run -d $Project -e $Environment -t clean
+pio run -d $Project -e $Environment
 ```
 
-必须看到清理命令正常结束。若失败，不继续构建。
-
-### 4.4 构建当前板固件
-
-```powershell
-pio run -d $Project -e esp32-s3-devkitc-1
-```
-
-构建通过时必须同时满足：
-
-- 末尾出现 `[SUCCESS]`。
-- 硬件摘要显示 `16MB Flash`。
-- 没有 `Error` 或 `FAILED`。
-
-PlatformIO 可能仍显示基础板名称中的 `N8 (8 MB QD, No PSRAM)`，那是继承的基础板
-显示名；本项目展开后的实际构建参数必须是 16MB Flash、`qio_opi` 和
-`BOARD_HAS_PSRAM`。以本项目已验证的构建配置和 `HARDWARE ... 16MB Flash` 为准。
-
-### 4.5 上传到当前板
-
-先确保没有其他串口工具占用 `$Port`，然后执行：
+构建末尾必须出现 `[SUCCESS]`，硬件摘要必须显示 16MB Flash，且没有 `Error`
+或 `FAILED`。然后上传当前板：
 
 ```powershell
-pio run -d $Project -e esp32-s3-devkitc-1 `
+pio run -d $Project -e $Environment `
   -t upload --upload-port $Port
 ```
 
-正常上传通常会依次经历连接、识别 ESP32-S3、擦除/写入、校验和复位。只有命令末尾
-出现 `[SUCCESS]` 才算上传完成。把日志中显示的 MAC 与本手册表格核对。
+只有上传命令末尾出现 `[SUCCESS]` 才算写入完成。上传日志中的 MAC 必须：
 
-### 4.6 自动连接失败时手动进入下载模式
+- 节点 1、2、4、5：与第 1 节已有记录完全一致；
+- 节点 6-10：立即写入现场记录，后续不得把另一块板沿用为同一 Node；
+- 未来节点 3、11-13：分配实物时首次记录，并经第二人复核。
 
-只有上传出现 `Failed to connect`、`No serial data received` 或持续连接超时时才执行：
+MAC 不符时停止，不修改 Node 配置来迁就错误实物板。
 
-1. 按住板上的 `BOOT` 键不放。
-2. 点按一次 `RST` 或 `EN` 键，然后松开 `RST/EN`。
-3. 再松开 `BOOT` 键，使板保持在下载模式。
-4. 确认 `$Port` 仍是当前串口。
-5. 重新执行上传命令。
+### 4.4 上传失败时进入下载模式
 
-若操作 BOOT 后 COM 号发生变化，重新查询串口并更新 `$Port`，不要继续使用已经消失
-的端口。仍失败时检查 USB 数据线、USB 转串口连接和供电，但不要改 Node 配置碰运气。
+只有出现 `Failed to connect`、`No serial data received` 或持续连接超时时：
 
-### 4.7 上传后做串口复核
+1. 按住 `BOOT`。
+2. 点按并松开 `RST/EN`。
+3. 松开 `BOOT`。
+4. 重新识别 `$Port` 并重试上传。
 
-上传成功后打开串口监视器：
+若 COM 口变化，必须更新 `$Port`。仍失败时检查 USB 数据线、串口连接和供电，不更换
+Node 配置碰运气。
+
+### 4.5 启动、地址和标签复核
+
+上传成功后打开监视器：
 
 ```powershell
 pio device monitor --port $Port --baud 115200
 ```
 
-点按一次 `RST/EN` 让新固件重新启动，观察约 10 秒：
+复位并观察约 10 秒：
 
-- 不应反复出现 `WiFi placeholder SSID`。
-- 不应出现 `Invalid multi-output configuration`。
-- 当前固件在配置正常时可能不主动打印成功信息；没有日志本身不代表烧录失败。
+- 不得反复出现 Wi-Fi 占位错误；
+- 不得出现无效输出配置；
+- 当前 Node、groups、output 1 / GPIO4 和 IPv4 必须与第 1 节目标行一致；
+- 生产镜像必须显示固定 `spi_dma_fixed_gpio4` 后端，且不得出现
+  `fatal scheduled_output_unsupported`；
+- 未实际联网或接灯时，不得把无报错当成硬件验收。
 
-按 `Ctrl+C` 退出监视器。必须先退出监视器，否则下一次上传可能报串口被占用。
+按 `Ctrl+C` 退出监视器。立即贴
+`Node X / strip_YY / GPIO4 / 192.168.31.2ZZ` 标签，填写记录并拔下 USB。
 
-### 4.8 立即贴签、记录并断开
+## 5. 当前九节点烧录顺序
 
-完成当前板后立刻执行三件事：
+严格按以下顺序重复第 4 节：
 
-1. 在实物板上贴本手册规定的 `ESP32 X / Node X` 标签。
-2. 在烧录记录中填写实物编号、Node、MAC、COM 号、上传结果和操作者。
-3. 拔下当前板 USB，确认电脑上已经没有这块板的串口，再开始下一块。
+```text
+1 -> 2 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
+```
 
-不要把未贴签的已烧板放回待烧板区域。每次构建会覆盖同一输出目录中的
-`firmware.bin`，所以不能仅凭文件时间或文件名判断它属于哪个 Node。
+每一步都必须重新设置 `$Node` 和 `$Environment`，再 clean、构建、上传、核对 MAC、
+复核启动信息、贴签并断开。不要在这一批次插入节点 3、11、12、13，也不要复用旧
+五节点拓扑中 Node 1、2、4 的多输出固件。
 
-## 5. 流水线逐块执行
+## 6. 逐板上电验收
 
-### 5.1 烧录 ESP32 1 为 Node 1
+烧录和标签完成后，每次仍只接一块控制器和它对应的一条灯带：
 
-1. 只连接 ESP32 1。
-2. 查询并设置本次 `$Port`。
-3. 确认唯一 include 是：
+1. 核对数据线只来自该 ESP32 的 GPIO4，经独立 SN74LVC1T45 到该灯带 DI。
+2. 核对 Host 使用
+   `config/profiles/ws2811-installed-one-esp-per-strip.yaml`。
+3. 验证该 Node 的 IP 可达，UDP v3 帧只包含 output 1，groups 与表格一致；
+   同时确认 beacon 被接收、`clock_ready=1` 且 scheduled frame 开始提交。
+4. 确认生产帧包含同一 Host-monotonic `apply_at_us`，其值约为发送准备时刻后
+   20 ms；不得向生产固件发送 immediate frame。
+5. 依次验证全黑、低亮度红、绿、蓝和动态效果；全黑期间不得存在常亮区段。
+6. 停止发送并验证超时进入安全黑；恢复发送后不得回放陈旧帧。
+7. 不复位 ESP32，结束并重新启动同一 show；确认新的 `KEY_FRAME`/sequence 1
+   被接受；确认三轮 KEY 只产生一次物理 commit，`session_key_dupes` 记录冗余
+   副本，而普通重复或陈旧非 KEY 帧仍被拒绝。
+8. 记录供电、固件版本、profile/show、beacon/clock/scheduled 统计、结果和任何异常。
 
-   ```cpp
-   #include "node_configs/node_1.h"
-   ```
+固件 output task 每轮必须先检查安全超时，即使队列持续有帧也不能推迟安全黑。
+scheduled SPI 失败后不得越过已校验 deadline 盲目重发；应 fail closed 并恢复已提交
+帧或安全黑。
 
-4. 执行清理、构建、上传。
-5. 核对上传日志 MAC 为 `e0:72:a1:d3:53:34`。
-6. 用 115200 波特率复核启动日志，然后按 `Ctrl+C`。
-7. 贴 `ESP32 1 / Node 1` 标签并填写记录。
-8. 拔下 ESP32 1。
+一块板通过不能证明其他节点或多节点同时运行已通过。
 
-如果 MAC 不符，立刻停止。不要把错误实物板继续当作 ESP32 1。
+## 7. 原子切换到现场九节点
 
-### 5.2 ESP32 1 完成后，开始烧录 ESP32 2
+逐板验收完成后再安排维护窗口：
 
-1. 确认 ESP32 1 已贴签、已记录、已拔下。
-2. 连接且只连接 ESP32 2。
-3. 重新查询 COM 号，并重新设置 `$Port`；即使仍显示 COM9，也要重新确认。
-4. 打开 `config.local.h`，只把 Node include 改成：
+1. 冻结九节点的 Node/strip/MAC/IP/固件记录并归档 `validate-show` 和
+   `inspect-topology` 输出。
+2. 停止 Host 物理输出并关闭灯光系统电源。
+3. 完成九条数据线的独立连接；每块 ESP32 只连接表中自己的灯带。
+4. Host 一次性选择
+   `config/profiles/ws2811-installed-one-esp-per-strip.yaml`。
+5. 上电后先发全黑，再验证逐节点隔离、同时主色、共享 sequence 和
+   `apply_at_us`、beacon/clock readiness、超时和恢复。
+6. 按第 7.3 节用逻辑分析仪记录 10/20/40 groups 的发送时长与跨节点锁存偏差。
+7. 运行第 7.1 节当前九条的 300 秒 staged show，记录丢帧、重启、deadline
+   error、可见偏差、温升和电源异常。
 
-   ```cpp
-   #include "node_configs/node_2.h"
-   ```
+不得在 live run 中混用旧五节点 profile、旧多输出固件、新单输出固件和新接线。任一
+门禁失败时先停止输出并断电，再把 profile、固件集和接线作为整体回滚。九节点通过也
+不能写成完整 13 节点通过。
 
-5. 运行 Node include 唯一性检查，确认屏幕只显示 `node_2.h`。
-6. 重新执行 clean。不能复用 Node 1 的构建产物。
-7. 重新构建并确认 `[SUCCESS]`、16MB Flash。
-8. 上传到当前 `$Port`，核对 MAC 为 `e0:72:a1:d3:30:3c`。
-9. 串口复核后按 `Ctrl+C` 退出。
-10. 贴 `ESP32 2 / Node 2` 标签、填写记录、拔下 ESP32 2。
+### 7.1 当前九节点：验证、检查和运行
 
-Node 2 的第三路即使暂未接灯带，也必须保留现有 `node_2.h` 完整配置；烧录人员不得
-修改该头文件。
+在仓库根目录依次执行；三条命令必须使用同一组 profile/show：
 
-### 5.3 ESP32 2 完成后，开始烧录 ESP32 4
+```powershell
+.\.python\Scripts\python.exe -m light_engine `
+  --config config/profiles/ws2811-installed-one-esp-per-strip.yaml `
+  validate-show --show config/shows/ws2811-stage3-installed-300s.yaml
 
-1. 确认 ESP32 2 已贴签、已记录、已拔下。
-2. 连接且只连接 ESP32 4，重新识别 `$Port`。
-3. 把唯一 Node include 改成：
+.\.python\Scripts\python.exe -m light_engine `
+  --config config/profiles/ws2811-installed-one-esp-per-strip.yaml `
+  inspect-topology --show config/shows/ws2811-stage3-installed-300s.yaml
 
-   ```cpp
-   #include "node_configs/node_4.h"
-   ```
+.\.python\Scripts\python.exe -m light_engine `
+  --config config/profiles/ws2811-installed-one-esp-per-strip.yaml run `
+  --show config/shows/ws2811-stage3-installed-300s.yaml
+```
 
-4. 依次执行唯一性检查、clean、构建和上传。
-5. 核对上传日志 MAC 为 `e0:72:a1:d2:7e:08`。
-6. 串口复核后退出监视器。
-7. 贴 `ESP32 4 / Node 4` 标签、填写记录、拔下 ESP32 4。
+`inspect-topology` 必须显示九条数字灯带，Node 集合为
+`1, 2, 4, 5, 6, 7, 8, 9, 10`，每个 Node 只有 output 1 / GPIO4。
 
-### 5.4 ESP32 4 完成后，开始烧录 ESP32 5
+### 7.2 完整十三数字节点：验证、检查和运行
 
-开始前必须确认现场连接的是独立标号为 ESP32 5 的板。
+只有节点 1-13 全部具有已核对的实物板、标签、MAC、IP、固件和独立灯带后，才执行：
 
-1. 确认 ESP32 4 已贴签、已记录、已拔下。
-2. 连接且只连接 ESP32 5，重新识别 `$Port`。
-3. 把唯一 Node include 改成：
+```powershell
+.\.python\Scripts\python.exe -m light_engine `
+  --config config/profiles/cabin-lighting-v3-site-local.yaml `
+  validate-show --show config/shows/ws2811-stage3-full-300s.yaml
 
-   ```cpp
-   #include "node_configs/node_5.h"
-   ```
+.\.python\Scripts\python.exe -m light_engine `
+  --config config/profiles/cabin-lighting-v3-site-local.yaml `
+  inspect-topology --show config/shows/ws2811-stage3-full-300s.yaml
 
-4. 依次执行唯一性检查、clean、构建和上传。
-5. 核对上传日志 MAC 为 `e0:72:a1:d3:08:b0`。
-6. 串口复核后退出监视器。
-7. 贴 `ESP32 5 / Node 5` 标签，并把 MAC 和上传结果填入记录。
-8. 拔下 ESP32 5。
+.\.python\Scripts\python.exe -m light_engine `
+  --config config/profiles/cabin-lighting-v3-site-local.yaml run `
+  --show config/shows/ws2811-stage3-full-300s.yaml
+```
 
-## 6. 烧录完成后的收尾
+该组合每个逻辑帧向十三个 ESP32 各发送一个 UDP v3 数据报。两个 site profile 都是
+UDP-only，均未启用 RS-485；它们不能控制或验收 `zone_32` COB。COB 必须使用已明确
+配置串口并启用 RS-485 的独立现场流程验收，不能把数字节点全通过写成 COB 通过。
 
-四块板烧完后，不再修改或重烧任何板，先完成以下收尾：
+### 7.3 多节点 scheduled latch 验收
 
-1. 确认桌面上只有四块已贴签板：Node 1、Node 2、Node 4、Node 5。
-2. 确认未来预留的 Node 3 没有在本批次被烧录。
-3. 对照上传日志逐项确认 Node 1、2、4 的 MAC 与留档一致。
-4. 确认 Node 5 的 MAC 为 `e0:72:a1:d3:08:b0`。
-5. 确认每一块板都有一次构建 `[SUCCESS]` 和一次上传 `[SUCCESS]` 记录。
-6. 确认所有串口监视器均已按 `Ctrl+C` 退出。
-7. 保留 `config.local.h` 在本机，不提交、不发送，也不要删除到需要重新询问密码。
-8. 将四块板分别装入防静电袋或明确分区，保持标签可见，交给下一步网络地址绑定和
-   上电验收流程。
+此项必须在灯带、控制器和共同地全部上电后执行，软件测试或肉眼视频不能代替逻辑
+分析仪记录：
 
-烧录完成只证明固件写入成功，不等于 Wi-Fi、UDP、灯带输出或整车效果已经通过硬件
-验证。未完成后续上电验收前，状态仍为 **NOT HARDWARE VERIFIED**。
+1. 同时采集至少一条 10 groups、一条 20 groups 和一条 40 groups 节点的
+   GPIO4/电平转换后数据线，并关联同一 sequence / `apply_at_us`。
+2. 核对 3.2 MHz 四位 `1000`/`1100` 编码完整事务及前后各 200-byte
+   低电平 guard：10 groups 为 520 bytes / 1300 us，20 groups 为 640 bytes /
+   1600 us，40 groups 为 880 bytes / 2200 us。三种长度必须从不同
+   `tx_start` 开始，而不是同时开始发送。
+3. 核对 Host 使用 `192.168.31.255:9001` 的 monotonic clock beacon 和统一
+   20 ms apply 提前量；节点统计中的 `beacon_ok`、`clock_samples`、
+   `clock_ready`、`scheduled_commit` 与 `deadline_error_us` 必须留档。
+4. 确认 sequence-1 KEY 在所有节点发送前已全部编码，三轮间隔 2 ms，单节点三份
+   raw 完全相同，且只产生一次 session generation 和物理 commit；
+   `session_key_dupes` 应记录冗余副本。
+5. `clock_not_ready`、`scheduled_late`、`scheduled_far`、
+   `scheduled_invalid`、`scheduled_start_late`、`scheduled_cancelled` 或
+   `immediate_dropped` 在稳定运行中增加时停止验收并定位，不得切换为 immediate。
+6. 保存原始逻辑分析仪捕获、固件/Host版本、节点映射、profile/show、统计日志和
+   实测跨节点锁存偏差。没有这些记录时，只能写“软件已实现”，不能写“严格同步
+   已通过硬件验收”。
 
-## 7. 烧录记录模板
+## 8. 烧录与验收记录模板
 
-每块板烧完立即填一行，不要等四块全部完成后凭记忆补写：
+| 时间 | 操作者 | Node | 灯带 | MAC | IP | COM | 构建/上传 | 单节点颜色/黑场 | 标签 |
+|---|---|---:|---|---|---|---|---|---|---|
+|  |  | 1 | `strip_11` | `e0:72:a1:d3:53:34` | `.201` |  |  |  |  |
+|  |  | 2 | `strip_41` | `e0:72:a1:d3:30:3c` | `.202` |  |  |  |  |
+|  |  | 4 | `strip_12` | `e0:72:a1:d2:7e:08` | `.204` |  |  |  |  |
+|  |  | 5 | `strip_22` | `e0:72:a1:d3:08:b0` | `.205` |  |  |  |  |
+|  |  | 6 | `strip_21` |  | `.206` |  |  |  |  |
+|  |  | 7 | `strip_31` |  | `.207` |  |  |  |  |
+|  |  | 8 | `strip_42` |  | `.208` |  |  |  |  |
+|  |  | 9 | `strip_91` |  | `.209` |  |  |  |  |
+|  |  | 10 | `strip_92` |  | `.210` |  |  |  |  |
 
-| 时间 | 操作者 | 实物板 | Node | MAC | COM | 构建 | 上传 | 启动日志复核 | 标签 |
-|---|---|---|---:|---|---|---|---|---|---|
-|  |  | ESP32 1 | 1 | `e0:72:a1:d3:53:34` |  | 成功/失败 | 成功/失败 | 通过/异常 | 已贴/未贴 |
-|  |  | ESP32 2 | 2 | `e0:72:a1:d3:30:3c` |  | 成功/失败 | 成功/失败 | 通过/异常 | 已贴/未贴 |
-|  |  | ESP32 4 | 4 | `e0:72:a1:d2:7e:08` |  | 成功/失败 | 成功/失败 | 通过/异常 | 已贴/未贴 |
-|  |  | ESP32 5 | 5 | `e0:72:a1:d3:08:b0` |  | 成功/失败 | 成功/失败 | 通过/异常 | 已贴/未贴 |
+完整 13 节点后续验收必须为节点 3、11、12、13 新增真实记录，不得用空白行、预留 IP
+或软件测试代替实物证据。
 
-## 8. 常见烧录故障的停止条件
+## 9. 常见故障的停止条件
 
 | 现象 | 处理 |
 |---|---|
-| 找不到 COM 口 | 拔插当前板、重新查询；检查数据线和 USB 转串口，不继续上传 |
-| COM 口被占用 | 关闭串口监视器和其他串口软件，再重试 |
-| `No serial data received` | 按第 4.6 节手动进入下载模式，重新识别 COM |
-| 上传日志 MAC 与表格不符 | 停止并重新确认实物编号，不继续下一块 |
-| 配置检查出现两个 Node include | 停止，修正到只剩当前 Node 的一条 include |
-| 构建显示 `FAILED` | 不上传旧的 `firmware.bin`，先解决本次构建失败 |
-| 上传显示 `FAILED` | 不贴已完成标签，不开始下一块 |
-| 启动日志出现 Wi-Fi 占位值 | 修正本机配置后 clean、重建、重新上传当前板 |
-| 启动日志提示输出配置无效 | 停止，不修改 Node 头文件，交回项目负责人检查 |
+| 找不到或占用 COM 口 | 拔插当前板、关闭监视器、重新识别，不继续上传 |
+| `$Node` 超出 1-13 或缺少对应环境 | 修正 `$Node`，确认 `esp32-s3-node-N` 环境后重新 clean |
+| 构建或上传 `FAILED` | 不上传或复用旧 `firmware.bin`，只处理当前板 |
+| MAC 与已有记录不符 | 停止并重新确认实物板，不修改配置迁就 |
+| Node、groups、output、GPIO 或 IP 不符 | 停止，不修改 `node_X.h`，交回项目负责人 |
+| 全黑仍有灯段常亮或其他灯带受影响 | 停止多节点上电，记录接线、地参考、信号和帧证据 |
+| UDP 中断后未进入安全黑 | 停止，不进入整组验收 |
+| 多节点 sequence 不一致或出现陈旧帧 | 停止 300 秒 show，检查 profile、Host 和固件版本 |
+| `clock_ready` 不为 1 或 beacon/drop 计数异常 | 停止，检查广播地址、子网、Host 时钟和固件环境 |
+| scheduled drop 或 `immediate_dropped` 增加 | 停止，不降级为 immediate；检查 deadline、时钟窗口和生产 profile |
+| 三轮 KEY 产生多次 generation/commit，或 generation 0 接受非 KEY | 停止，核对 Host/固件版本、session admission 和 `session_key_dupes` |
+| KEY preparation 后的输出失败使后续完整帧永久被门禁 | 停止；固件必须回滚物理输出但保留该 generation 的 admission |
+| scheduled SPI 失败后出现第二次越期事务 | 停止，固件必须 fail closed，不得盲目 retry |
+| 逻辑分析仪时长不是 1300/1600/2200 us 或跨节点锁存偏差未留档 | 不得声称严格同步硬件通过 |
 
-任何失败都只重做当前板。不要跳到下一块，也不要用上一块的固件文件继续上传。
+完成真实记录前，所有物理结果仍为 **NOT HARDWARE VERIFIED**。

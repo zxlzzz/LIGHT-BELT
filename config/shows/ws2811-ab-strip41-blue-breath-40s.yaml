@@ -1,0 +1,25 @@
+# First unrestricted linear-effect gate on Node2 / strip41.
+# Pure blue isolates brightness interpolation from mixed-channel color behavior.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-ab-strip41-blue-breath-40s"
+  duration: 40.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "strip41-blue-breath"
+      start: 5.0
+      end: 35.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 6.0, min_brightness: 0.20}
+      color: {mode: "solid", color: [0.0, 0.0, 0.65]}

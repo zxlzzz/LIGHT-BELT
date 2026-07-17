@@ -1,0 +1,216 @@
+# Exploratory two-strip sweep of every registered effect.
+# This is not a hardware acceptance or safe-palette claim.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-ab-two-node-all-effects-171s"
+  duration: 171.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "static-red-anchor"
+      start: 1.0
+      end: 4.0
+      target: &both_strips {type: "digital_set", ids: ["strip_41", "strip_42"]}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.65, 0.0, 0.0]}
+
+    - id: "static-green-anchor"
+      start: 4.0
+      end: 7.0
+      target: *both_strips
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.0, 0.65, 0.0]}
+
+    - id: "static-blue-anchor"
+      start: 7.0
+      end: 10.0
+      target: *both_strips
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: &blue {mode: "solid", color: [0.0, 0.0, 0.65]}
+
+    - id: "blue-breath"
+      start: 11.0
+      end: 20.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 6.0, min_brightness: 0.20}
+      color: *blue
+
+    - id: "two-level-blue-step-pulse"
+      start: 21.0
+      end: 30.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "step_pulse"
+        params:
+          period: 4.0
+          low_color: [0.0, 0.0, 0.35]
+          high_color: [0.0, 0.0, 0.65]
+      color: {mode: "effect_default"}
+
+    - id: "blue-single-dot"
+      start: 31.0
+      end: 40.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: *blue
+
+    - id: "blue-theater-phase"
+      start: 41.0
+      end: 50.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "theater_phase"
+        params: {speed: 2.5}
+      color: *blue
+
+    - id: "orange-color-wipe"
+      start: 51.0
+      end: 60.0
+      target: *both_strips
+      origin: "start"
+      effect:
+        mode: "fixed"
+        id: "color_wipe"
+        params: {speed: 2.5}
+      color: &orange {mode: "solid", color: [0.58, 0.20, 0.0]}
+
+    - id: "blue-chase"
+      start: 61.0
+      end: 70.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "chase"
+        params:
+          speed: 2.5
+          width: 1
+          gap: 4
+          direction: "forward"
+          trail: 0.0
+          color_source: "static"
+          beat_boost: 0.0
+      color: *blue
+
+    - id: "orange-comet"
+      start: 71.0
+      end: 80.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "comet"
+        params: {speed: 2.5, tail_length: 0.25, decay: 0.85}
+      color: *orange
+
+    - id: "blue-twinkle"
+      start: 81.0
+      end: 90.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "twinkle"
+        params: {density: 0.15, fade_time: 0.8, color_source: "solid"}
+      color: *blue
+
+    - id: "blue-calm"
+      start: 91.0
+      end: 100.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "calm"
+        params: {period: 8.0}
+      color: *blue
+
+    - id: "blue-audio-pulse"
+      start: 101.0
+      end: 110.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "audio_pulse"
+        params: {attack: 0.4, release: 0.15}
+      color: *blue
+
+    - id: "orange-bass-pulse"
+      start: 111.0
+      end: 120.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "bass_pulse"
+        params: {attack: 0.6, release: 0.2}
+      color: *orange
+
+    - id: "blue-spectrum"
+      start: 121.0
+      end: 130.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "spectrum"
+        params:
+          bass_zones: []
+          mid_zones: []
+          treble_zones: ["strip_41", "strip_42"]
+      color: {mode: "effect_default"}
+
+    - id: "generated-video-ambient"
+      start: 131.0
+      end: 140.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "video_ambient"
+        params: {smoothing: 0.15}
+      color: {mode: "effect_default"}
+
+    - id: "generated-video-audio-fusion"
+      start: 141.0
+      end: 150.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "video_audio_fusion"
+        params:
+          video_weight: 0.65
+          audio_weight: 0.35
+          bass_boost: 1.2
+          treble_limit: 0.15
+      color: {mode: "effect_default"}
+
+    - id: "full-color-wave"
+      start: 151.0
+      end: 160.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "color_wave"
+        params: {speed: 0.35, width: 0.7, hue_cycle_rate: 0.04}
+      color: {mode: "effect_default"}
+
+    - id: "demo-cycle"
+      start: 161.0
+      end: 170.0
+      target: *both_strips
+      effect:
+        mode: "fixed"
+        id: "demo"
+        params:
+          cycle_interval: 1.5
+          effects: ["static", "breath", "single_dot", "theater_phase", "color_wipe", "chase"]
+      color: *blue

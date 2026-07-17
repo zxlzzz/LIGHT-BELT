@@ -16,6 +16,32 @@
 #include "../src/ws2811_spi6_encoder.h"
 #include "../src/ws2811_spi_encoder.h"
 
+namespace light_belt {
+
+constexpr EmergencyOutputPolicy kNode2EmergencyTestPolicy = {2, {1, 4, 10}};
+
+bool isNode2EmergencyFrameAllowed(const OwnedNodeFrame &candidate) {
+  return isEmergencyFrameAllowed(candidate, kNode2EmergencyTestPolicy);
+}
+
+bool isNode2EmergencyTransitionAllowed(
+    const OwnedNodeFrame &previous,
+    const OwnedNodeFrame &candidate) {
+  return isEmergencyTransitionAllowed(
+      previous, candidate, kNode2EmergencyTestPolicy);
+}
+
+bool isNode2EmergencyChangeIntervalAllowed(
+    uint32_t previous_write_ms,
+    uint32_t candidate_write_ms,
+    bool payload_changed,
+    bool safe_state) {
+  return isEmergencyChangeIntervalAllowed(
+      previous_write_ms, candidate_write_ms, payload_changed, safe_state);
+}
+
+}  // namespace light_belt
+
 namespace {
 
 const light_belt::OutputDescriptor kOneOutput[] = {{1, 4, 2}};
@@ -120,6 +146,15 @@ light_belt::OwnedNodeFrame own(
   TEST_ASSERT_TRUE(light_belt::copyUdpV3Frame(
       frame, outputs, output_count, &owned));
   return owned;
+}
+
+light_belt::OwnedNodeFrame makeEmergencyFrame(uint32_t sequence = 1) {
+  light_belt::OwnedNodeFrame frame{};
+  frame.node_id = 2;
+  frame.sequence = sequence;
+  frame.output_count = 1;
+  frame.outputs[0].descriptor = {1, 4, 10};
+  return frame;
 }
 
 uint8_t encodedPair(uint8_t source, uint8_t pair) {
@@ -330,6 +365,44 @@ void test_presentation_clock_lower_envelope_ignores_slow_outliers() {
   TEST_ASSERT_EQUAL(
       static_cast<int>(light_belt::PresentationClockStatus::Uncertain),
       static_cast<int>(clock.status(353000)));
+}
+
+void test_default_presentation_clock_uses_bounded_32_sample_window() {
+  light_belt::PresentationClock clock;
+
+  // Three low-delay samples form a stable lower-envelope quorum even when
+  // most of the 32-sample Wi-Fi window consists of temporary slow packets.
+  for (uint32_t index = 0; index < 32; ++index) {
+    const uint64_t host_us = static_cast<uint64_t>(index + 1U) * 100000U;
+    const uint64_t offset_us =
+        index == 0 ? 1000U : index == 10 ? 1100U : index == 20 ? 1200U
+                                                         : 50000U + index;
+    TEST_ASSERT_TRUE(clock.observeBeacon(
+        index + 1U, host_us, host_us + offset_us));
+  }
+
+  TEST_ASSERT_EQUAL_UINT8(32, clock.sampleCount());
+  TEST_ASSERT_EQUAL_INT64(1000, clock.offsetUs());
+  TEST_ASSERT_EQUAL_UINT64(200, clock.uncertaintyUs());
+  TEST_ASSERT_EQUAL(
+      static_cast<int>(light_belt::PresentationClockStatus::Ready),
+      static_cast<int>(clock.status(3250031)));
+
+  // A full new window must evict every old lower-envelope sample. This keeps
+  // the estimator robust without pinning its offset to historical latency.
+  for (uint32_t index = 0; index < 32; ++index) {
+    const uint64_t host_us = static_cast<uint64_t>(index + 33U) * 100000U;
+    const uint64_t offset_us = 20000U + (index % 3U) * 100U;
+    TEST_ASSERT_TRUE(clock.observeBeacon(
+        index + 33U, host_us, host_us + offset_us));
+  }
+
+  TEST_ASSERT_EQUAL_UINT8(32, clock.sampleCount());
+  TEST_ASSERT_EQUAL_INT64(20000, clock.offsetUs());
+  TEST_ASSERT_EQUAL_UINT64(0, clock.uncertaintyUs());
+  TEST_ASSERT_EQUAL(
+      static_cast<int>(light_belt::PresentationClockStatus::Ready),
+      static_cast<int>(clock.status(6420100)));
 }
 
 void test_presentation_clock_readiness_checks_samples_age_and_uncertainty() {
@@ -550,6 +623,10 @@ void test_runtime_scheduling_stats_are_independent_and_zero_initialized() {
   TEST_ASSERT_EQUAL_UINT32(0, stats.scheduled_cancelled.load());
   TEST_ASSERT_EQUAL_UINT32(0, stats.session_key_duplicates.load());
   TEST_ASSERT_EQUAL_UINT32(0, stats.immediate_dropped.load());
+  TEST_ASSERT_EQUAL_UINT32(0, stats.identical_skipped.load());
+  TEST_ASSERT_EQUAL_UINT32(0, stats.physical_offset_waits.load());
+  TEST_ASSERT_EQUAL_UINT32(0, stats.physical_offset_cancelled.load());
+  TEST_ASSERT_EQUAL_UINT32(0, stats.emergency_payload_rejected.load());
   TEST_ASSERT_EQUAL_INT32(0, stats.last_deadline_error_us.load());
 
   stats.clock_beacons_received.fetch_add(3);
@@ -569,6 +646,10 @@ void test_runtime_scheduling_stats_are_independent_and_zero_initialized() {
   stats.scheduled_cancelled.fetch_add(3);
   stats.session_key_duplicates.fetch_add(4);
   stats.immediate_dropped.fetch_add(5);
+  stats.identical_skipped.fetch_add(6);
+  stats.physical_offset_waits.fetch_add(8);
+  stats.physical_offset_cancelled.fetch_add(9);
+  stats.emergency_payload_rejected.fetch_add(7);
   stats.last_deadline_error_us.store(-17);
 
   TEST_ASSERT_EQUAL_UINT32(3, stats.clock_beacons_received.load());
@@ -588,7 +669,258 @@ void test_runtime_scheduling_stats_are_independent_and_zero_initialized() {
   TEST_ASSERT_EQUAL_UINT32(3, stats.scheduled_cancelled.load());
   TEST_ASSERT_EQUAL_UINT32(4, stats.session_key_duplicates.load());
   TEST_ASSERT_EQUAL_UINT32(5, stats.immediate_dropped.load());
+  TEST_ASSERT_EQUAL_UINT32(6, stats.identical_skipped.load());
+  TEST_ASSERT_EQUAL_UINT32(8, stats.physical_offset_waits.load());
+  TEST_ASSERT_EQUAL_UINT32(9, stats.physical_offset_cancelled.load());
+  TEST_ASSERT_EQUAL_UINT32(7, stats.emergency_payload_rejected.load());
   TEST_ASSERT_EQUAL_INT32(-17, stats.last_deadline_error_us.load());
+}
+
+void test_node2_emergency_whitelist_accepts_only_exact_full_frames() {
+  light_belt::OwnedNodeFrame frame = makeEmergencyFrame();
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(frame));
+
+  for (uint8_t group = 1; group < 10; ++group) {
+    frame.outputs[0].pixels[group] = {0x20, 0x08, 0x00};
+  }
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(frame));
+
+  for (uint8_t group = 1; group < 10; ++group) {
+    frame.outputs[0].pixels[group] = {0x20, 0x10, 0x00};
+  }
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(frame));
+
+  frame = makeEmergencyFrame();
+  frame.outputs[0].pixels[1] = {0x00, 0x00, 0x20};
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame.outputs[0].pixels[1] = {0x20, 0x08, 0x00};
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(frame));
+
+  frame.outputs[0].pixels[2] = {0x20, 0x08, 0x00};
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame = makeEmergencyFrame();
+  frame.outputs[0].pixels[0] = {0x00, 0x00, 0x20};
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame = makeEmergencyFrame();
+  frame.outputs[0].pixels[1] = {0x20, 0x04, 0x00};
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame = makeEmergencyFrame();
+  frame.flags = light_belt::UDP_V3_FLAG_SCHEDULED_APPLY;
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame = makeEmergencyFrame();
+  frame.flags = light_belt::UDP_V3_FLAG_SAFE_STATE;
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame.outputs[0].pixels[1] = {0x20, 0x08, 0x00};
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame = makeEmergencyFrame();
+  frame.outputs[0].descriptor.pixel_count = 9;
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+  frame = makeEmergencyFrame();
+  frame.node_id = 8;
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(frame));
+}
+
+void test_identical_physical_payload_skip_requires_success_cache_and_no_recovery() {
+  light_belt::OwnedNodeFrame physical = makeEmergencyFrame(10);
+  for (uint8_t group = 1; group < 10; ++group) {
+    physical.outputs[0].pixels[group] = {0x20, 0x08, 0x00};
+  }
+  light_belt::OwnedNodeFrame candidate = physical;
+  candidate.sequence = 11;
+  candidate.media_timestamp_us = 123456;
+  candidate.apply_at_us = 654321;
+  candidate.flags = light_belt::UDP_V3_FLAG_KEY_FRAME;
+
+  TEST_ASSERT_TRUE(
+      light_belt::physicalPixelPayloadsEqual(candidate, physical));
+  TEST_ASSERT_FALSE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, false, false));
+  TEST_ASSERT_FALSE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, true, true));
+  TEST_ASSERT_FALSE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, true, false));
+  candidate.flags = 0;
+  TEST_ASSERT_TRUE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, true, false));
+  TEST_ASSERT_TRUE(light_belt::canSkipContentDedupeRefresh(
+      candidate, physical, true, false));
+  candidate.flags = light_belt::UDP_V3_FLAG_SAFE_STATE;
+  TEST_ASSERT_TRUE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, true, false));
+  TEST_ASSERT_FALSE(light_belt::canSkipContentDedupeRefresh(
+      candidate, physical, true, false));
+  candidate.flags = 0;
+
+  candidate.outputs[0].pixels[9].g = 0x10;
+  TEST_ASSERT_FALSE(
+      light_belt::physicalPixelPayloadsEqual(candidate, physical));
+  TEST_ASSERT_FALSE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, true, false));
+  candidate = physical;
+  candidate.outputs[0].descriptor.gpio = 5;
+  TEST_ASSERT_FALSE(
+      light_belt::physicalPixelPayloadsEqual(candidate, physical));
+}
+
+void test_node2_emergency_transition_graph_and_change_interval() {
+  light_belt::OwnedNodeFrame black = makeEmergencyFrame();
+  light_belt::OwnedNodeFrame warm_low = makeEmergencyFrame();
+  light_belt::OwnedNodeFrame warm_high = makeEmergencyFrame();
+  for (uint8_t group = 1; group < 10; ++group) {
+    warm_low.outputs[0].pixels[group] = {0x20, 0x08, 0x00};
+    warm_high.outputs[0].pixels[group] = {0x20, 0x10, 0x00};
+  }
+  light_belt::OwnedNodeFrame blue0 = makeEmergencyFrame();
+  light_belt::OwnedNodeFrame blue1 = makeEmergencyFrame();
+  light_belt::OwnedNodeFrame blue8 = makeEmergencyFrame();
+  blue0.outputs[0].pixels[1] = {0x00, 0x00, 0x20};
+  blue1.outputs[0].pixels[2] = {0x00, 0x00, 0x20};
+  blue8.outputs[0].pixels[9] = {0x00, 0x00, 0x20};
+
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      black, warm_low));
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyTransitionAllowed(
+      black, warm_high));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      warm_low, warm_high));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      warm_high, warm_low));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      warm_low, black));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      black, blue0));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      blue0, blue1));
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyTransitionAllowed(
+      blue0, blue8));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      blue8, blue0));
+
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyChangeIntervalAllowed(
+      1000, 1100, true, false));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyChangeIntervalAllowed(
+      1000, 1150, true, false));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyChangeIntervalAllowed(
+      1000, 1001, false, false));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyChangeIntervalAllowed(
+      1000, 1001, true, true));
+}
+
+void test_node2_emergency_gate1m_payloads_and_edges() {
+  light_belt::OwnedNodeFrame black = makeEmergencyFrame();
+  light_belt::OwnedNodeFrame green_uniform = makeEmergencyFrame();
+  for (uint8_t group = 1; group < 10; ++group) {
+    green_uniform.outputs[0].pixels[group] = {0x00, 0x20, 0x00};
+  }
+  TEST_ASSERT_TRUE(
+      light_belt::isNode2EmergencyFrameAllowed(green_uniform));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      black, green_uniform));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      green_uniform, black));
+
+  light_belt::OwnedNodeFrame green0 = makeEmergencyFrame();
+  light_belt::OwnedNodeFrame green1 = makeEmergencyFrame();
+  green0.outputs[0].pixels[1] = {0x00, 0x20, 0x00};
+  green1.outputs[0].pixels[2] = {0x00, 0x20, 0x00};
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      black, green0));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      green0, green1));
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyTransitionAllowed(
+      green1, green_uniform));
+
+  light_belt::OwnedNodeFrame phases[3] = {
+      makeEmergencyFrame(), makeEmergencyFrame(), makeEmergencyFrame()};
+  for (uint8_t phase = 0; phase < 3; ++phase) {
+    for (uint8_t position = phase; position < 9; position += 3) {
+      phases[phase].outputs[0].pixels[position + 1U] = {0x00, 0x00, 0x20};
+    }
+    TEST_ASSERT_TRUE(light_belt::isNode2EmergencyFrameAllowed(phases[phase]));
+  }
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      black, phases[0]));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      phases[0], phases[1]));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      phases[1], phases[2]));
+  TEST_ASSERT_TRUE(light_belt::isNode2EmergencyTransitionAllowed(
+      phases[2], phases[0]));
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyTransitionAllowed(
+      phases[0], phases[2]));
+  phases[0].outputs[0].pixels[2] = {0x00, 0x00, 0x20};
+  TEST_ASSERT_FALSE(light_belt::isNode2EmergencyFrameAllowed(phases[0]));
+}
+
+void test_node8_emergency_policy_requires_exact20_and_usable19_graph() {
+  const light_belt::EmergencyOutputPolicy node8_policy = {8, {1, 4, 20}};
+  light_belt::OwnedNodeFrame black = makeEmergencyFrame();
+  black.node_id = 8;
+  black.outputs[0].descriptor.pixel_count = 20;
+
+  TEST_ASSERT_TRUE(light_belt::isEmergencyFrameAllowed(black, node8_policy));
+  TEST_ASSERT_FALSE(light_belt::isEmergencyFrameAllowed(
+      black, light_belt::kNode2EmergencyTestPolicy));
+  light_belt::OwnedNodeFrame wrong_length = black;
+  wrong_length.outputs[0].descriptor.pixel_count = 19;
+  TEST_ASSERT_FALSE(
+      light_belt::isEmergencyFrameAllowed(wrong_length, node8_policy));
+
+  light_belt::OwnedNodeFrame blue18 = black;
+  light_belt::OwnedNodeFrame blue0 = black;
+  light_belt::OwnedNodeFrame blue17 = black;
+  blue18.outputs[0].pixels[19] = {0x00, 0x00, 0x20};
+  blue0.outputs[0].pixels[1] = {0x00, 0x00, 0x20};
+  blue17.outputs[0].pixels[18] = {0x00, 0x00, 0x20};
+  TEST_ASSERT_TRUE(light_belt::isEmergencyTransitionAllowed(
+      black, blue0, node8_policy));
+  TEST_ASSERT_TRUE(light_belt::isEmergencyTransitionAllowed(
+      blue18, blue0, node8_policy));
+  TEST_ASSERT_FALSE(light_belt::isEmergencyTransitionAllowed(
+      blue17, blue0, node8_policy));
+
+  light_belt::OwnedNodeFrame phases[3] = {black, black, black};
+  const uint8_t expected_counts[3] = {7, 6, 6};
+  for (uint8_t phase = 0; phase < 3; ++phase) {
+    uint8_t count = 0;
+    for (uint8_t position = phase; position < 19; position += 3) {
+      phases[phase].outputs[0].pixels[position + 1U] = {0x00, 0x00, 0x20};
+      ++count;
+    }
+    TEST_ASSERT_EQUAL_UINT8(expected_counts[phase], count);
+    TEST_ASSERT_TRUE(
+        light_belt::isEmergencyFrameAllowed(phases[phase], node8_policy));
+  }
+  TEST_ASSERT_TRUE(light_belt::isEmergencyTransitionAllowed(
+      black, phases[0], node8_policy));
+  TEST_ASSERT_TRUE(light_belt::isEmergencyTransitionAllowed(
+      phases[0], phases[1], node8_policy));
+  TEST_ASSERT_TRUE(light_belt::isEmergencyTransitionAllowed(
+      phases[1], phases[2], node8_policy));
+  TEST_ASSERT_TRUE(light_belt::isEmergencyTransitionAllowed(
+      phases[2], phases[0], node8_policy));
+  TEST_ASSERT_FALSE(light_belt::isEmergencyTransitionAllowed(
+      phases[0], phases[2], node8_policy));
+}
+
+void test_identical_logical_commit_advances_sequence_and_watchdog() {
+  light_belt::OwnedNodeFrame physical = makeEmergencyFrame(1);
+  for (uint8_t group = 1; group < 10; ++group) {
+    physical.outputs[0].pixels[group] = {0x20, 0x08, 0x00};
+  }
+  const light_belt::OutputDescriptor output = {1, 4, 10};
+  light_belt::MultiOutputFrameState state(&output, 1);
+  TEST_ASSERT_TRUE(state.commitFrame(physical, 100));
+
+  light_belt::OwnedNodeFrame candidate = physical;
+  candidate.sequence = 2;
+  TEST_ASSERT_TRUE(light_belt::canSkipPhysicalRefresh(
+      candidate, physical, true, false));
+  TEST_ASSERT_TRUE(state.commitFrame(candidate, 900));
+  TEST_ASSERT_EQUAL_UINT32(2, state.lastSequence());
+  TEST_ASSERT_EQUAL_UINT32(2, state.refreshCount());
+  TEST_ASSERT_FALSE(state.timedOut(1900, 1000));
+  TEST_ASSERT_TRUE(state.timedOut(1901, 1000));
 }
 
 void test_scheduled_udp_v3_golden_vector_preserves_apply_deadline() {
@@ -772,6 +1104,103 @@ void test_only_key_frame_sequence_one_starts_a_new_session() {
   TEST_ASSERT_FALSE(light_belt::isSessionGenerationAdmitted(4, 3, 5));
 }
 
+void test_only_scheduled_continuations_require_admitted_session() {
+  light_belt::OwnedNodeFrame candidate{};
+  candidate.sequence = 57;
+
+  TEST_ASSERT_FALSE(light_belt::requiresAdmittedSession(candidate));
+
+  candidate.flags = light_belt::UDP_V3_FLAG_SCHEDULED_APPLY;
+  TEST_ASSERT_TRUE(light_belt::requiresAdmittedSession(candidate));
+
+  candidate.sequence = 1;
+  candidate.flags = light_belt::UDP_V3_FLAG_SCHEDULED_APPLY |
+                    light_belt::UDP_V3_FLAG_KEY_FRAME;
+  TEST_ASSERT_FALSE(light_belt::requiresAdmittedSession(candidate));
+}
+
+void test_session_recovery_requires_recent_scheduled_key_and_safe_deadline() {
+  light_belt::OwnedNodeFrame candidate{};
+  candidate.sequence = 1;
+  candidate.flags = light_belt::UDP_V3_FLAG_KEY_FRAME |
+                    light_belt::UDP_V3_FLAG_SCHEDULED_APPLY;
+  candidate.apply_at_us = 1020000;
+
+  TEST_ASSERT_TRUE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::Uncertain,
+      1000000, 2000000));
+  TEST_ASSERT_TRUE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::InsufficientSamples,
+      1000000, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::TooLate,
+      light_belt::PresentationClockStatus::Ready,
+      1000000, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::TooFar,
+      light_belt::PresentationClockStatus::Ready,
+      1000000, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::InvalidApplyTime,
+      light_belt::PresentationClockStatus::Ready,
+      1000000, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::Ok,
+      light_belt::PresentationClockStatus::Ready,
+      1000000, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::Stale,
+      1000000, 2000000));
+
+  candidate.flags = light_belt::UDP_V3_FLAG_SCHEDULED_APPLY;
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::Uncertain,
+      1000000, 2000000));
+  candidate.flags = light_belt::UDP_V3_FLAG_KEY_FRAME |
+                    light_belt::UDP_V3_FLAG_SCHEDULED_APPLY;
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::Uncertain,
+      0, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::Uncertain,
+      1020001, 2000000));
+  TEST_ASSERT_FALSE(light_belt::isSessionRecoveryEligible(
+      candidate, light_belt::ApplyDeadlineResult::ClockNotReady,
+      light_belt::PresentationClockStatus::Uncertain,
+      1000000, 10000));
+}
+
+void test_recovery_sequence_reset_is_explicit_and_commits_only_on_success() {
+  uint8_t raw[light_belt::UDP_V3_MAX_PACKET_LEN] = {};
+  light_belt::MultiOutputFrameState state(kOneOutput, 1);
+
+  size_t len = makeFrame(raw, 3, 300, kOneOutput, 1);
+  light_belt::OwnedNodeFrame frame =
+      own(parse(raw, len, 3, kOneOutput, 1), kOneOutput, 1);
+  TEST_ASSERT_TRUE(state.commitFrame(frame, 10));
+
+  len = makeFrame(raw, 3, 2, kOneOutput, 1);
+  frame = own(parse(raw, len, 3, kOneOutput, 1), kOneOutput, 1);
+  TEST_ASSERT_FALSE(state.isCandidateAcceptable(frame));
+  TEST_ASSERT_TRUE(state.isCandidateAcceptable(frame, true));
+  TEST_ASSERT_EQUAL_UINT32(300, state.lastSequence());
+
+  // Granting recovery at preparation time never mutates committed state.
+  TEST_ASSERT_EQUAL_UINT32(300, state.lastSequence());
+  TEST_ASSERT_TRUE(state.commitFrame(frame, 20, true));
+  TEST_ASSERT_EQUAL_UINT32(2, state.lastSequence());
+
+  len = makeFrame(raw, 3, 1, kOneOutput, 1);
+  frame = own(parse(raw, len, 3, kOneOutput, 1), kOneOutput, 1);
+  TEST_ASSERT_FALSE(state.commitFrame(frame, 30));
+}
+
 void test_key_frame_sequence_one_resets_committed_sequence_and_refreshes() {
   uint8_t raw[light_belt::UDP_V3_MAX_PACKET_LEN] = {};
   light_belt::MultiOutputFrameState state(kOneOutput, 1);
@@ -937,13 +1366,44 @@ void test_spi_encoder_lengths_for_1_10_20_40_and_100_groups() {
   }
 }
 
-void test_scheduled_spi_wire_times_cover_installed_strip_lengths() {
+void test_fixed_gpio4_spi4_encoder_uses_500us_guards_and_uniform_region() {
+  light_belt::RgbPixel pixels[3] = {
+      {0x12, 0x34, 0x56},
+      {0x12, 0x34, 0x56},
+      {0x12, 0x34, 0x56},
+  };
+  uint8_t encoded[light_belt::WS2811_FIXED_GPIO4_SPI_MAX_FRAME_BYTES] = {};
+  size_t encoded_len = 0;
+  TEST_ASSERT_TRUE(light_belt::encodeWs2811FixedGpio4Spi(
+      pixels, 3, light_belt::Ws2811ColorOrder::RGB,
+      encoded, sizeof(encoded), &encoded_len));
+  TEST_ASSERT_EQUAL_UINT32(436, encoded_len);
+  for (size_t index = 0;
+       index < light_belt::WS2811_FIXED_GPIO4_SPI_GUARD_BYTES; ++index) {
+    TEST_ASSERT_EQUAL_HEX8(0, encoded[index]);
+    TEST_ASSERT_EQUAL_HEX8(0, encoded[encoded_len - 1U - index]);
+  }
+  assertEncodedByte(
+      encoded, light_belt::WS2811_FIXED_GPIO4_SPI_GUARD_BYTES, 0x12);
+  TEST_ASSERT_TRUE(light_belt::ws2811FixedGpio4SpiUniformEncodedGroups(
+      encoded, encoded_len, 3));
+  const uint32_t original_hash =
+      light_belt::ws2811EncodedHash(encoded, encoded_len);
+  encoded[light_belt::WS2811_FIXED_GPIO4_SPI_GUARD_BYTES +
+          light_belt::WS2811_SPI_BYTES_PER_GROUP] ^= 0x01;
+  TEST_ASSERT_NOT_EQUAL(
+      original_hash, light_belt::ws2811EncodedHash(encoded, encoded_len));
+  TEST_ASSERT_FALSE(light_belt::ws2811FixedGpio4SpiUniformEncodedGroups(
+      encoded, encoded_len, 3));
+}
+
+void test_scheduled_production_spi4_wire_times_cover_installed_lengths() {
   const uint16_t groups[] = {10, 20, 40};
-  const uint32_t expected_bytes[] = {184, 304, 544};
-  const uint32_t expected_micros[] = {460, 760, 1360};
+  const uint32_t expected_bytes[] = {520, 640, 880};
+  const uint32_t expected_micros[] = {1300, 1600, 2200};
   for (size_t index = 0; index < 3; ++index) {
     const uint64_t encoded_len =
-        light_belt::ws2811SpiFrameSize(groups[index]);
+        light_belt::ws2811FixedGpio4SpiFrameSize(groups[index]);
     const uint64_t bit_micros = encoded_len * 8U * 1000000U;
     const uint32_t wire_time_us = static_cast<uint32_t>(
         (bit_micros + light_belt::WS2811_SPI_CLOCK_HZ - 1U) /
@@ -951,6 +1411,12 @@ void test_scheduled_spi_wire_times_cover_installed_strip_lengths() {
     TEST_ASSERT_EQUAL_UINT32(expected_bytes[index], encoded_len);
     TEST_ASSERT_EQUAL_UINT32(expected_micros[index], wire_time_us);
   }
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
+      static_cast<uint64_t>(light_belt::WS2811_SPI_CLOCK_HZ) *
+          light_belt::WS2811_FIXED_GPIO4_SPI_RESET_LOW_US,
+      static_cast<uint64_t>(
+          light_belt::WS2811_FIXED_GPIO4_SPI_GUARD_BYTES) * 8U *
+          1000000U);
 }
 
 void test_spi_encoder_rejects_invalid_inputs_without_touching_destination() {
@@ -975,6 +1441,34 @@ void test_spi_encoder_rejects_invalid_inputs_without_touching_destination() {
   TEST_ASSERT_EQUAL_UINT32(
       0, light_belt::ws2811SpiFrameSize(
              light_belt::MAX_PIXELS_PER_OUTPUT + 1));
+}
+
+void test_spi_encoded_diagnostics_cover_buffer_and_uniform_groups() {
+  light_belt::RgbPixel pixels[3] = {
+      {0x12, 0x34, 0x56},
+      {0x12, 0x34, 0x56},
+      {0x12, 0x34, 0x56},
+  };
+  uint8_t encoded[light_belt::WS2811_SPI_MAX_FRAME_BYTES] = {};
+  size_t encoded_len = 0;
+  TEST_ASSERT_TRUE(light_belt::encodeWs2811Spi(
+      pixels, 3, light_belt::Ws2811ColorOrder::RGB,
+      encoded, sizeof(encoded), &encoded_len));
+  TEST_ASSERT_TRUE(
+      light_belt::ws2811UniformEncodedGroups(encoded, encoded_len, 3));
+
+  const uint32_t original_hash =
+      light_belt::ws2811EncodedHash(encoded, encoded_len);
+  TEST_ASSERT_NOT_EQUAL(0, original_hash);
+  encoded[light_belt::WS2811_SPI_GUARD_BYTES +
+          light_belt::WS2811_SPI_BYTES_PER_GROUP] ^= 0x01;
+  TEST_ASSERT_NOT_EQUAL(
+      original_hash, light_belt::ws2811EncodedHash(encoded, encoded_len));
+  TEST_ASSERT_FALSE(
+      light_belt::ws2811UniformEncodedGroups(encoded, encoded_len, 3));
+  TEST_ASSERT_FALSE(
+      light_belt::ws2811UniformEncodedGroups(encoded, encoded_len - 1, 3));
+  TEST_ASSERT_EQUAL_UINT32(0, light_belt::ws2811EncodedHash(nullptr, 0));
 }
 
 void test_spi3_encoder_exact_00_ff_aa_55_patterns_and_guards() {
@@ -1107,8 +1601,11 @@ void test_spi3_encoder_rejects_invalid_inputs_without_mutation() {
 
 void test_spi6_encoder_exact_vectors_guards_and_group_limits() {
   TEST_ASSERT_EQUAL_UINT32(5000000, light_belt::WS2811_SPI6_CLOCK_HZ);
+  TEST_ASSERT_EQUAL_UINT32(500, light_belt::WS2811_SPI6_RESET_LOW_US);
+  TEST_ASSERT_EQUAL_UINT32(313, light_belt::WS2811_SPI6_PRE_GUARD_BYTES);
+  TEST_ASSERT_EQUAL_UINT32(313, light_belt::WS2811_SPI6_POST_GUARD_BYTES);
   TEST_ASSERT_EQUAL_UINT32(18, light_belt::WS2811_SPI6_BYTES_PER_GROUP);
-  TEST_ASSERT_EQUAL_UINT32(1864, light_belt::WS2811_SPI6_MAX_FRAME_BYTES);
+  TEST_ASSERT_EQUAL_UINT32(2426, light_belt::WS2811_SPI6_MAX_FRAME_BYTES);
 
   const uint8_t sources[] = {0x00, 0xFF, 0xAA, 0x55};
   const uint8_t expected[][6] = {
@@ -1125,23 +1622,27 @@ void test_spi6_encoder_exact_vectors_guards_and_group_limits() {
     TEST_ASSERT_TRUE(light_belt::encodeWs2811Spi6(
         &pixel, 1, light_belt::Ws2811ColorOrder::RGB,
         encoded, sizeof(encoded), &encoded_len));
-    TEST_ASSERT_EQUAL_UINT32(82, encoded_len);
+    TEST_ASSERT_EQUAL_UINT32(644, encoded_len);
     for (size_t index = 0;
-         index < light_belt::WS2811_SPI6_GUARD_BYTES;
+         index < light_belt::WS2811_SPI6_PRE_GUARD_BYTES;
          ++index) {
       TEST_ASSERT_EQUAL_HEX8(0, encoded[index]);
+    }
+    for (size_t index = 0;
+         index < light_belt::WS2811_SPI6_POST_GUARD_BYTES;
+         ++index) {
       TEST_ASSERT_EQUAL_HEX8(0, encoded[encoded_len - 1U - index]);
     }
     for (uint8_t channel = 0; channel < 3; ++channel) {
       TEST_ASSERT_EQUAL_HEX8_ARRAY(
           expected[pattern],
-          encoded + light_belt::WS2811_SPI6_GUARD_BYTES + channel * 6U,
+          encoded + light_belt::WS2811_SPI6_PRE_GUARD_BYTES + channel * 6U,
           6);
     }
   }
 
-  TEST_ASSERT_EQUAL_UINT32(424, light_belt::ws2811Spi6FrameSize(20));
-  TEST_ASSERT_EQUAL_UINT32(1864, light_belt::ws2811Spi6FrameSize(100));
+  TEST_ASSERT_EQUAL_UINT32(986, light_belt::ws2811Spi6FrameSize(20));
+  TEST_ASSERT_EQUAL_UINT32(2426, light_belt::ws2811Spi6FrameSize(100));
   TEST_ASSERT_EQUAL_UINT32(0, light_belt::ws2811Spi6FrameSize(0));
   TEST_ASSERT_EQUAL_UINT32(0, light_belt::ws2811Spi6FrameSize(101));
   const light_belt::RgbPixel pixel = {1, 2, 3};
@@ -1154,6 +1655,24 @@ void test_spi6_encoder_exact_vectors_guards_and_group_limits() {
   TEST_ASSERT_EQUAL_UINT32(123, encoded_len);
   TEST_ASSERT_EQUAL_HEX8(0x5A, encoded[0]);
   TEST_ASSERT_EQUAL_HEX8(0x5A, encoded[sizeof(encoded) - 1U]);
+
+  light_belt::RgbPixel uniform[3] = {
+      {0x12, 0x34, 0x56},
+      {0x12, 0x34, 0x56},
+      {0x12, 0x34, 0x56},
+  };
+  size_t uniform_len = 0;
+  TEST_ASSERT_TRUE(light_belt::encodeWs2811Spi6(
+      uniform, 3, light_belt::Ws2811ColorOrder::RGB,
+      encoded, sizeof(encoded), &uniform_len));
+  TEST_ASSERT_TRUE(light_belt::ws2811Spi6UniformEncodedGroups(
+      encoded, uniform_len, 3));
+  encoded[light_belt::WS2811_SPI6_PRE_GUARD_BYTES +
+          light_belt::WS2811_SPI6_BYTES_PER_GROUP] ^= 0x01;
+  TEST_ASSERT_FALSE(light_belt::ws2811Spi6UniformEncodedGroups(
+      encoded, uniform_len, 3));
+  TEST_ASSERT_FALSE(light_belt::ws2811Spi6UniformEncodedGroups(
+      encoded, uniform_len - 1U, 3));
 }
 
 void test_parallel_spi_encoder_uses_qio_lane_masks_and_keeps_data3_low() {
@@ -1435,6 +1954,7 @@ int runTests() {
   RUN_TEST(test_udp_v3_clock_beacon_rejects_length_header_and_crc_errors);
   RUN_TEST(test_presentation_clock_uses_window_minimum_and_spread);
   RUN_TEST(test_presentation_clock_lower_envelope_ignores_slow_outliers);
+  RUN_TEST(test_default_presentation_clock_uses_bounded_32_sample_window);
   RUN_TEST(test_presentation_clock_readiness_checks_samples_age_and_uncertainty);
   RUN_TEST(test_presentation_clock_accepts_zero_policy_tolerances);
   RUN_TEST(test_presentation_clock_orders_by_host_time_and_reacquires_after_expiry);
@@ -1442,6 +1962,12 @@ int runTests() {
   RUN_TEST(test_presentation_clock_rejects_unrepresentable_offsets_and_deadlines);
   RUN_TEST(test_transmit_start_compensates_wire_time_and_rejects_late_frames);
   RUN_TEST(test_runtime_scheduling_stats_are_independent_and_zero_initialized);
+  RUN_TEST(test_node2_emergency_whitelist_accepts_only_exact_full_frames);
+  RUN_TEST(test_identical_physical_payload_skip_requires_success_cache_and_no_recovery);
+  RUN_TEST(test_node2_emergency_transition_graph_and_change_interval);
+  RUN_TEST(test_node2_emergency_gate1m_payloads_and_edges);
+  RUN_TEST(test_node8_emergency_policy_requires_exact20_and_usable19_graph);
+  RUN_TEST(test_identical_logical_commit_advances_sequence_and_watchdog);
   RUN_TEST(test_udp_v3_golden_vector_copies_and_commits_only_after_success);
   RUN_TEST(test_scheduled_udp_v3_golden_vector_preserves_apply_deadline);
   RUN_TEST(test_owned_frame_survives_udp_buffer_reuse_and_uses_configured_order);
@@ -1449,14 +1975,19 @@ int runTests() {
   RUN_TEST(test_invalid_incomplete_duplicate_and_oversized_frames_do_not_commit);
   RUN_TEST(test_duplicate_stale_and_wrap_sequences_use_only_committed_sequence);
   RUN_TEST(test_only_key_frame_sequence_one_starts_a_new_session);
+  RUN_TEST(test_only_scheduled_continuations_require_admitted_session);
+  RUN_TEST(test_session_recovery_requires_recent_scheduled_key_and_safe_deadline);
+  RUN_TEST(test_recovery_sequence_reset_is_explicit_and_commits_only_on_success);
   RUN_TEST(test_key_frame_sequence_one_resets_committed_sequence_and_refreshes);
   RUN_TEST(test_timeout_black_commits_only_after_physical_success);
   RUN_TEST(test_udp_safe_state_commit_is_normalized_to_black_and_does_not_timeout);
   RUN_TEST(test_spi_encoder_exact_00_ff_aa_55_patterns_and_guards);
   RUN_TEST(test_spi_encoder_preserves_warm_rgb_values_and_reorders_grb_only);
   RUN_TEST(test_spi_encoder_lengths_for_1_10_20_40_and_100_groups);
-  RUN_TEST(test_scheduled_spi_wire_times_cover_installed_strip_lengths);
+  RUN_TEST(test_fixed_gpio4_spi4_encoder_uses_500us_guards_and_uniform_region);
+  RUN_TEST(test_scheduled_production_spi4_wire_times_cover_installed_lengths);
   RUN_TEST(test_spi_encoder_rejects_invalid_inputs_without_touching_destination);
+  RUN_TEST(test_spi_encoded_diagnostics_cover_buffer_and_uniform_groups);
   RUN_TEST(test_spi3_encoder_exact_00_ff_aa_55_patterns_and_guards);
   RUN_TEST(test_spi3_encoder_preserves_rgb_and_reorders_grb_only);
   RUN_TEST(test_spi3_encoder_lengths_for_1_10_20_40_and_100_groups);

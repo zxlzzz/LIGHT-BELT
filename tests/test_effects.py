@@ -28,14 +28,15 @@ def _assert_sequence(frame, ctx):
 
 
 class TestEffectRegistry:
-    def test_all_14_effects_registered(self):
+    def test_all_17_effects_registered(self):
         effects = list_effects()
-        assert len(effects) == 14
+        assert len(effects) == 17
         required = [
             "static", "breath", "color_wave", "chase", "comet",
             "audio_pulse", "bass_pulse", "spectrum",
             "video_ambient", "video_audio_fusion", "calm",
-            "color_wipe", "twinkle", "demo",
+            "color_wipe", "twinkle", "demo", "step_pulse", "single_dot",
+            "theater_phase",
         ]
         for name in required:
             assert name in effects, f"Missing effect: {name}"
@@ -169,6 +170,86 @@ class TestAllEffects:
         _assert_rgbcct_zones(frame)
         _assert_sequence(frame, ctx)
         assert "demo_current" in frame.metadata
+
+    def test_step_pulse_changes_only_at_half_period(self, ctx):
+        effect = create_effect("step_pulse")
+        ctx.mode_parameters.update(
+            {
+                "period": 4.0,
+                "low_color": [32 / 255, 8 / 255, 0.0],
+                "high_color": [32 / 255, 16 / 255, 0.0],
+            }
+        )
+        ctx.mode_parameters["cue_local_time"] = 1.99
+        low = effect.process(ctx)
+        ctx.mode_parameters["cue_local_time"] = 2.0
+        high = effect.process(ctx)
+
+        assert low.strips[0].pixels == [(32 / 255, 8 / 255, 0.0)] * 10
+        assert high.strips[0].pixels == [(32 / 255, 16 / 255, 0.0)] * 10
+
+    def test_single_dot_uses_one_discrete_pixel(self, ctx):
+        effect = create_effect("single_dot")
+        ctx.mode_parameters.update(
+            {
+                "speed": 5.0,
+                "direction": "forward",
+                "color": [0.0, 0.0, 32 / 255],
+                "cue_local_time": 0.4,
+            }
+        )
+        frame = effect.process(ctx)
+
+        assert frame.strips[0].pixels.count((0.0, 0.0, 32 / 255)) == 1
+        assert frame.strips[0].pixels[2] == (0.0, 0.0, 32 / 255)
+
+    def test_single_dot_bounce_is_adjacent_without_repeated_endpoints(self, ctx):
+        effect = create_effect("single_dot")
+        ctx.mode_parameters.update(
+            {
+                "speed": 5.0,
+                "direction": "bounce",
+                "color": [0.0, 0.0, 32 / 255],
+            }
+        )
+        positions = []
+        for step in range(20):
+            ctx.mode_parameters["cue_local_time"] = step / 5.0
+            frame = effect.process(ctx)
+            positions.append(
+                frame.strips[0].pixels.index((0.0, 0.0, 32 / 255))
+            )
+
+        assert positions == [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+            8, 7, 6, 5, 4, 3, 2, 1, 0, 1,
+        ]
+        assert all(
+            abs(right - left) == 1
+            for left, right in zip(positions, positions[1:])
+        )
+
+    def test_theater_phase_uses_exact_three_phase_masks(self, ctx):
+        effect = create_effect("theater_phase")
+        ctx.mode_parameters.update(
+            {
+                "speed": 2.5,
+                "color": [0.0, 0.0, 32 / 255],
+            }
+        )
+        active_by_phase = []
+        for phase in range(3):
+            ctx.mode_parameters["cue_local_time"] = phase / 2.5
+            frame = effect.process(ctx)
+            active_by_phase.append(
+                [
+                    index
+                    for index, pixel in enumerate(frame.strips[0].pixels)
+                    if pixel == (0.0, 0.0, 32 / 255)
+                ]
+            )
+
+        assert active_by_phase == [[0, 3, 6, 9], [1, 4, 7], [2, 5, 8]]
 
     def test_chase_position_changes(self, ctx):
         eff = create_effect("chase")

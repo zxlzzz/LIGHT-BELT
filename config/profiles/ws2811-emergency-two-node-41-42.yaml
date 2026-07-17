@@ -1,0 +1,67 @@
+# Emergency two-node Immediate profile: Node2/strip41 and Node8/strip42.
+# NOT HARDWARE VERIFIED.
+
+outputs:
+  mode: "production"
+  enabled: ["udp_v3"]
+  exit_safe_state: true
+  udp_v3:
+    enabled: true
+    protocol_version: 3
+    presentation:
+      mode: "immediate"
+  rs485_v2:
+    enabled: false
+
+system:
+  platform: "windows"
+  output_fps: 5.0
+  clock:
+    mode: "internal"
+  smoothing:
+    max_brightness: 1.0
+    gamma: 1.0
+
+layout:
+  topology_version: 3
+  digital_output_policy: "multi_output_diagnostic"
+  total_strips: 2
+  zones:
+    - {id: "zone_32", type: rgbcct, label: "disabled_analog_placeholder", video_zone: left, direction: forward}
+  analog_nodes:
+    - node_id: 17
+      zone_id: "zone_32"
+      video_zone: "left"
+      channel_order: "RGBWC"
+      fade_ms: 0
+  strips:
+    - {id: "strip_41", type: digital, pixel_count: 10, video_zone: right, direction: forward}
+    - {id: "strip_42", type: digital, pixel_count: 20, video_zone: right, direction: forward}
+  digital_nodes:
+    - {node_id: 2, host: "192.168.31.202", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 8, host: "192.168.31.208", port: 9001, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
+  digital_segments: []
+  digital_outputs:
+    - {node_id: 2, output_id: 1, gpio: 4, strip_id: "strip_41", pixel_count: 10, direction: forward}
+    - {node_id: 8, output_id: 1, gpio: 4, strip_id: "strip_42", pixel_count: 20, direction: forward}
+  virtual_paths:
+    - id: "strip41_effect_groups_2_to_10"
+      segments:
+        - strip_id: "strip_41"
+          source_start: 1
+          pixel_count: 9
+          direction: "forward"
+          gap_after_pixels: 0
+    - id: "strip42_effect_groups_2_to_20"
+      segments:
+        - strip_id: "strip_42"
+          source_start: 1
+          pixel_count: 19
+          direction: "forward"
+          gap_after_pixels: 0
+  video_zone_map:
+    left: ["zone_32"]
+    right: ["strip_41", "strip_42"]
+    top: []
+    bottom: []
+    center: []

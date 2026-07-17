@@ -1,0 +1,25 @@
+# Node2-only mirror of the Node8 Blue20 isolation gate.
+# Keep both physical nodes connected and powered while only Node2 receives UDP.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-emergency-node2-strip41-blue-60s"
+  duration: 60.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "node2-blue20-forward-isolation"
+      start: 5.0
+      end: 45.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: {mode: "solid", color: [0.0, 0.0, 0.12549019607843137]}

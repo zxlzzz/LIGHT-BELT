@@ -1,0 +1,55 @@
+# Node2 unrestricted Immediate A/B profile for the 15 FPS breath boundary.
+# It differs from the 30 FPS profile only in output_fps.
+# NOT HARDWARE VERIFIED.
+
+outputs:
+  mode: "production"
+  enabled: ["udp_v3"]
+  exit_safe_state: true
+  udp_v3:
+    enabled: true
+    protocol_version: 3
+    presentation:
+      mode: "immediate"
+  rs485_v2:
+    enabled: false
+
+system:
+  platform: "windows"
+  output_fps: 15.0
+  clock:
+    mode: "internal"
+  smoothing:
+    max_brightness: 0.35
+    gamma: 1.30
+
+layout:
+  topology_version: 3
+  digital_output_policy: "multi_output_diagnostic"
+  total_strips: 1
+  zones:
+    - id: "zone_32"
+      type: "rgbcct"
+      label: "disabled analog placeholder"
+      video_zone: "left"
+      direction: "forward"
+  analog_nodes:
+    - node_id: 17
+      zone_id: "zone_32"
+      video_zone: "left"
+      channel_order: "RGBWC"
+      fade_ms: 0
+  strips:
+    - {id: "strip_41", type: digital, pixel_count: 10, video_zone: right, direction: forward}
+  digital_nodes:
+    - {node_id: 2, host: "192.168.31.202", port: 9001, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+  digital_segments: []
+  digital_outputs:
+    - {node_id: 2, output_id: 1, gpio: 4, strip_id: "strip_41", pixel_count: 10, direction: forward}
+  virtual_paths: []
+  video_zone_map:
+    left: ["zone_32"]
+    right: ["strip_41"]
+    top: []
+    bottom: []
+    center: []

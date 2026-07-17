@@ -26,6 +26,11 @@ logs/
 *.log
 artifacts/runs/
 
+# Local hardware freezes and credential-bearing field images
+/artifacts/baselines/ws2811-two-node-good-effects-20260717/
+/firmware/esp32_ws2811_node/baselines/**/firmware.bin
+/tmp/
+
 # Local tools, worktrees, and bootstrap caches
 .agent-worktrees/
 .python_broken_backup/

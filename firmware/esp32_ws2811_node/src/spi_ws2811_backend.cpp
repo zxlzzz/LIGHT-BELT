@@ -83,8 +83,13 @@ constexpr Ws2811ColorOrder kColorOrder = Ws2811ColorOrder::RGB;
 #if defined(LIGHT_BELT_FIXED_GPIO4_SPI) && \
     !defined(LIGHT_BELT_FIXED_GPIO4_DIAGNOSTIC)
 constexpr bool kScheduledApplySupported = true;
+constexpr uint32_t kPrimarySpiClockHz = WS2811_SPI_CLOCK_HZ;
+constexpr size_t kPrimarySpiMaxFrameBytes =
+    WS2811_FIXED_GPIO4_SPI_MAX_FRAME_BYTES;
 #else
 constexpr bool kScheduledApplySupported = false;
+constexpr uint32_t kPrimarySpiClockHz = WS2811_SPI_CLOCK_HZ;
+constexpr size_t kPrimarySpiMaxFrameBytes = WS2811_SPI_MAX_FRAME_BYTES;
 #endif
 
 uint32_t wireTimeUs(size_t encoded_len, uint32_t clock_hz) {
@@ -98,12 +103,26 @@ uint32_t wireTimeUs(size_t encoded_len, uint32_t clock_hz) {
   return rounded <= UINT32_MAX ? static_cast<uint32_t>(rounded) : 0;
 }
 
+bool pixelsUniform(const RgbPixel *pixels, uint16_t pixel_count) {
+  if (pixels == nullptr || pixel_count == 0) {
+    return false;
+  }
+  for (uint16_t pixel = 1; pixel < pixel_count; ++pixel) {
+    if (pixels[pixel].r != pixels[0].r ||
+        pixels[pixel].g != pixels[0].g ||
+        pixels[pixel].b != pixels[0].b) {
+      return false;
+    }
+  }
+  return true;
+}
+
 #if defined(LIGHT_BELT_QIO_DIAGNOSTIC)
 alignas(4) DMA_ATTR uint8_t
     kParallelDmaBuffer[WS2811_PARALLEL_SPI_MAX_FRAME_BYTES] = {};
 #else
 alignas(4) DMA_ATTR uint8_t
-    kDmaBuffers[MAX_OUTPUTS][WS2811_SPI_MAX_FRAME_BYTES] = {};
+    kDmaBuffers[MAX_OUTPUTS][kPrimarySpiMaxFrameBytes] = {};
 size_t kEncodedLengths[MAX_OUTPUTS] = {};
 #endif
 
@@ -135,7 +154,7 @@ bool initializeFixedSpi(
   bus.data5_io_num = -1;
   bus.data6_io_num = -1;
   bus.data7_io_num = -1;
-  bus.max_transfer_sz = WS2811_SPI_MAX_FRAME_BYTES;
+  bus.max_transfer_sz = kPrimarySpiMaxFrameBytes;
   bus.flags = SPICOMMON_BUSFLAG_MASTER | SPICOMMON_BUSFLAG_MOSI;
   if (spi_bus_initialize(host, &bus, SPI_DMA_CH_AUTO) != ESP_OK) {
     return false;
@@ -400,7 +419,7 @@ bool SpiWs2811Backend::begin(
   bus.data5_io_num = -1;
   bus.data6_io_num = -1;
   bus.data7_io_num = -1;
-  bus.max_transfer_sz = WS2811_SPI_MAX_FRAME_BYTES;
+  bus.max_transfer_sz = kPrimarySpiMaxFrameBytes;
   bus.flags = SPICOMMON_BUSFLAG_MASTER | SPICOMMON_BUSFLAG_MOSI;
 #endif
   if (spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO) != ESP_OK) {
@@ -413,7 +432,7 @@ bool SpiWs2811Backend::begin(
 #if defined(LIGHT_BELT_QIO_DIAGNOSTIC)
   config.clock_speed_hz = WS2811_PARALLEL_SPI_CLOCK_HZ;
 #else
-  config.clock_speed_hz = WS2811_SPI_CLOCK_HZ;
+  config.clock_speed_hz = kPrimarySpiClockHz;
 #endif
   config.spics_io_num = -1;
   config.flags = SPI_DEVICE_HALFDUPLEX;
@@ -426,8 +445,21 @@ bool SpiWs2811Backend::begin(
 
   if (kScheduledApplySupported) {
     const int actual_clock =
-        spi_get_actual_clock(APB_CLK_FREQ, WS2811_SPI_CLOCK_HZ, 128);
-    if (actual_clock <= 0) {
+        spi_get_actual_clock(APB_CLK_FREQ, kPrimarySpiClockHz, 128);
+    const uint64_t required_guard_bit_micros =
+        actual_clock > 0
+        ? static_cast<uint64_t>(actual_clock) *
+              WS2811_FIXED_GPIO4_SPI_RESET_LOW_US
+        : 0;
+    const uint64_t pre_guard_bit_micros =
+        static_cast<uint64_t>(WS2811_FIXED_GPIO4_SPI_GUARD_BYTES) * 8U *
+        1000000U;
+    const uint64_t post_guard_bit_micros =
+        static_cast<uint64_t>(WS2811_FIXED_GPIO4_SPI_GUARD_BYTES) * 8U *
+        1000000U;
+    if (actual_clock <= 0 ||
+        pre_guard_bit_micros < required_guard_bit_micros ||
+        post_guard_bit_micros < required_guard_bit_micros) {
       spi_bus_remove_device(device_);
       spi_bus_free(SPI2_HOST);
       device_ = nullptr;
@@ -486,13 +518,27 @@ SpiRefreshReport SpiWs2811Backend::prepare(const OwnedNodeFrame &frame) {
 
   size_t encoded_len = 0;
   const OwnedOutputFrame &output = frame.outputs[0];
-  if (!encodeWs2811Spi(
+  if (!encodeWs2811FixedGpio4Spi(
           output.pixels, output.descriptor.pixel_count, kColorOrder,
           kDmaBuffers[0], sizeof(kDmaBuffers[0]), &encoded_len) ||
       wireTimeUs(encoded_len, actual_clock_hz_) == 0) {
     report.status = SpiRefreshStatus::EncodeFailed;
     return report;
   }
+
+#if defined(LIGHT_BELT_ENCODED_FRAME_DIAGNOSTIC)
+  if (pixelsUniform(output.pixels, output.descriptor.pixel_count)) {
+    report.uniform_frame_checks = 1;
+    if (!ws2811FixedGpio4SpiUniformEncodedGroups(
+            kDmaBuffers[0], encoded_len, output.descriptor.pixel_count)) {
+      report.uniform_frame_mismatches = 1;
+      report.status = SpiRefreshStatus::IntegrityFailed;
+      return report;
+    }
+  }
+  prepared_encoded_hash_ =
+      ws2811EncodedHash(kDmaBuffers[0], encoded_len);
+#endif
 
   prepared_encoded_len_ = encoded_len;
   kEncodedLengths[0] = encoded_len;
@@ -522,6 +568,18 @@ SpiRefreshReport SpiWs2811Backend::transmitPrepared() {
     return report;
   }
 
+
+#if defined(LIGHT_BELT_ENCODED_FRAME_DIAGNOSTIC)
+  report.encoded_hash_checks = 1;
+  if (ws2811EncodedHash(kDmaBuffers[0], prepared_encoded_len_) !=
+      prepared_encoded_hash_) {
+    report.encoded_hash_mismatches = 1;
+    report.status = SpiRefreshStatus::IntegrityFailed;
+    cancelPrepared();
+    return report;
+  }
+#endif
+
   spi_transaction_t transaction{};
   transaction.length = prepared_encoded_len_ * 8U;
   transaction.tx_buffer = kDmaBuffers[0];
@@ -543,6 +601,7 @@ SpiRefreshReport SpiWs2811Backend::transmitPrepared() {
 void SpiWs2811Backend::cancelPrepared() {
   prepared_ = false;
   prepared_encoded_len_ = 0;
+  prepared_encoded_hash_ = 0;
 #if !defined(LIGHT_BELT_QIO_DIAGNOSTIC)
   kEncodedLengths[0] = 0;
 #endif
@@ -566,7 +625,13 @@ SpiRefreshReport SpiWs2811Backend::refresh(const OwnedNodeFrame &frame) {
     if (!prepared.ok()) {
       return prepared;
     }
-    return transmitPrepared();
+    SpiRefreshReport transmitted = transmitPrepared();
+    transmitted.encoded_hash_checks += prepared.encoded_hash_checks;
+    transmitted.encoded_hash_mismatches += prepared.encoded_hash_mismatches;
+    transmitted.uniform_frame_checks += prepared.uniform_frame_checks;
+    transmitted.uniform_frame_mismatches +=
+        prepared.uniform_frame_mismatches;
+    return transmitted;
   }
 
   SpiRefreshReport report{};

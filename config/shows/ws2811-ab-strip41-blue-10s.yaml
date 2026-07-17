@@ -1,0 +1,19 @@
+# Temporary A/B show. Blue is invariant under RGB/GRB red-green swapping.
+schema_version: 2
+
+show:
+  id: "ws2811-ab-strip41-blue-10s"
+  duration: 10.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+  cues:
+    - id: "strip41-static-blue"
+      start: 0.0
+      end: 10.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.0, 0.0, 0.65]}

@@ -1,0 +1,43 @@
+# Strong-visibility Immediate control for the corrected two-node VCCB=5V gate.
+# Group zero remains black. Green20 is already admitted by emergency firmware.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-emergency-two-node-green-static-staged-35s"
+  duration: 35.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "node2-only-green20-static"
+      start: 5.0
+      end: 10.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: &green20 {mode: "solid", color: [0.0, 0.12549019607843137, 0.0]}
+
+    - id: "node8-only-green20-static"
+      start: 15.0
+      end: 20.0
+      target: {type: "virtual_path", id: "strip42_effect_groups_2_to_20"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: *green20
+
+    - id: "both-node2-green20-static"
+      start: 25.0
+      end: 30.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: *green20
+
+    - id: "both-node8-green20-static"
+      start: 25.0
+      end: 30.0
+      target: {type: "virtual_path", id: "strip42_effect_groups_2_to_20"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: *green20

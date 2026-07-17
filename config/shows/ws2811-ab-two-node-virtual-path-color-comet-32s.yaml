@@ -1,0 +1,43 @@
+# One color-changing comet traverses strip41 and strip42 as one logical path.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-ab-two-node-virtual-path-color-comet-32s"
+  duration: 32.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  virtual_paths:
+    - id: "strip41-to-strip42"
+      origin: "start"
+      targets:
+        - {type: "digital_strip", id: "strip_41"}
+        - {type: "digital_strip", id: "strip_42"}
+
+  cues:
+    - id: "front-to-back-color-comet"
+      start: 1.0
+      end: 15.0
+      target: {type: "virtual_path", id: "strip41-to-strip42"}
+      origin: "start"
+      effect:
+        mode: "fixed"
+        id: "comet"
+        params: {speed: 6.0, tail_length: 0.25, decay: 0.84}
+      color: {mode: "effect_default"}
+
+    - id: "back-to-front-color-comet"
+      start: 16.0
+      end: 30.0
+      target: {type: "virtual_path", id: "strip41-to-strip42"}
+      origin: "end"
+      effect:
+        mode: "fixed"
+        id: "comet"
+        params: {speed: 6.0, tail_length: 0.25, decay: 0.84}
+      color: {mode: "effect_default"}

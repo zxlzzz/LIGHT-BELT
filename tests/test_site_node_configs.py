@@ -183,6 +183,27 @@ def test_platformio_has_one_reproducible_environment_per_node() -> None:
     assert "-DFASTLED_RMT_MEM_BLOCKS=2" in fastled
     assert "-DFASTLED_RMT_MAX_CHANNELS=4" in fastled
 
+    fastled_gpio4 = _ini_section(
+        ini, "env:esp32-s3-node-2-fastled-gpio4-immediate-ab"
+    )
+    assert ".pio/libdeps/esp32-s3-node-2-fastled-diagnostic" in fastled_gpio4
+    assert "${esp32-s3-common.build_flags}" in fastled_gpio4
+    assert "-DLIGHT_BELT_NODE_CONFIG=2" in fastled_gpio4
+    assert "-DLIGHT_BELT_FASTLED_GPIO4_IMMEDIATE_AB=1" in fastled_gpio4
+    assert "-DLIGHT_BELT_WS2811_RGB_OVERRIDE=1" in fastled_gpio4
+    assert "-DLIGHT_BELT_REQUIRE_SCHEDULED_APPLY=1" not in fastled_gpio4
+    assert "-DLIGHT_BELT_NODE2_LEGACY_MULTI_OUTPUT=1" not in fastled_gpio4
+
+
+def test_firmware_replays_startup_identity_without_blocking_runtime() -> None:
+    source = (FIRMWARE_DIR / "src/main.cpp").read_text(encoding="utf-8")
+
+    assert "while (!Serial)" not in source
+    assert "startup_identity_seen_on_connected_serial" in source
+    assert "static_cast<bool>(Serial)" in source
+    assert "!first_stats_emitted" in source
+    assert source.count("printStartupIdentity();") == 3
+
 
 def test_config_contract_keeps_topology_out_of_local_secrets() -> None:
     config = (FIRMWARE_DIR / "src/config.h").read_text(encoding="utf-8")

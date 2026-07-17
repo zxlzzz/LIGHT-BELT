@@ -5,7 +5,7 @@
 Build a reliable RK3588-hosted, video/music-driven lighting controller for the
 2100 mm x 1000 mm x 1800 mm cabin installation:
 
-- 13 independently driven 24V WS2811 RGB strips through ESP32-S3 controllers
+- 13 independently driven 24V WS2811 RGB strips through 13 ESP32-S3 controllers
 - one 24V common-anode RGB+CCT COB zone through one STM32 RS-485 node
 
 The cabin dimensions, placements, lengths, group counts, controller allocation,
@@ -54,32 +54,59 @@ All placement, length, and WS2811 group values in this table are
 
 The 13 digital runs total 260 independently addressable WS2811 groups.
 
-### Provisional controller and electrical contract
+### Production controller and electrical contract
 
-This five-node allocation is `NOT HARDWARE VERIFIED`, is not final wiring, and
-must remain configurable.
+Production uses one ESP32-S3 per WS2811 strip. Each node has exactly one
+production output: `output_id: 1` on GPIO4. Node allocation is physical
+configuration; logical IDs remain independent of node IDs, GPIO, and IP.
 
-| ESP32 node | GPIO4 | GPIO5 | GPIO6 |
-|---:|---|---|---|
-| 1 | `strip_11` | `strip_21` | `strip_31` |
-| 2 | `strip_41` | `strip_42` | `strip_43` |
-| 3 | `strip_44` | `strip_45` | `strip_93` |
-| 4 | `strip_12` | `strip_91` | `strip_92` |
-| 5 | `strip_22` | unused | unused |
+| ESP32 node | Logical strip | Groups | Output | GPIO | Site IPv4 |
+|---:|---|---:|---:|---:|---|
+| 1 | `strip_11` | 10 | 1 | 4 | `192.168.31.201` |
+| 2 | `strip_41` | 10 | 1 | 4 | `192.168.31.202` |
+| 3 | `strip_44` | 20 | 1 | 4 | `192.168.31.203` |
+| 4 | `strip_12` | 40 | 1 | 4 | `192.168.31.204` |
+| 5 | `strip_22` | 40 | 1 | 4 | `192.168.31.205` |
+| 6 | `strip_21` | 10 | 1 | 4 | `192.168.31.206` |
+| 7 | `strip_31` | 10 | 1 | 4 | `192.168.31.207` |
+| 8 | `strip_42` | 20 | 1 | 4 | `192.168.31.208` |
+| 9 | `strip_91` | 20 | 1 | 4 | `192.168.31.209` |
+| 10 | `strip_92` | 20 | 1 | 4 | `192.168.31.210` |
+| 11 | `strip_43` | 20 | 1 | 4 | `192.168.31.211` |
+| 12 | `strip_45` | 20 | 1 | 4 | `192.168.31.212` |
+| 13 | `strip_93` | 20 | 1 | 4 | `192.168.31.213` |
 
-Each strip has an independent data output through an SN74LVC1T45. The strips
+The current field subset is nodes `1`, `2`, `4`, `5`, `6`, `7`, `8`, `9`, and
+`10`. Nodes `3`, `11`, `12`, and `13` belong to the complete target but are not
+part of the nine-node field profile.
+
+The IPv4 column is the site address contract. It is implemented by
+`cabin-lighting-v3-site-local.yaml` for the complete target and by
+`ws2811-installed-one-esp-per-strip.yaml` for the current subset. The generic
+`cabin-lighting-v3-production.yaml` intentionally retains non-routable
+`192.0.2.x` TEST-NET endpoints and `REPLACE_WITH_RS485_PORT`; it is an offline
+production-shape template, not a site deployment profile. Never run it as a
+substitute for either site profile or describe its TEST-NET endpoints as the
+assigned site addresses.
+
+Each strip data path passes through its controller's SN74LVC1T45. The strips
 use parallel 24V power, the level shifters use a 5V B-side logic supply, and
-all supplies/controllers require a common ground. This electrical plan is
-`NOT HARDWARE VERIFIED`; final power segmentation is unknown and configurable.
-Final GPIO wiring, IP addresses, protocol node IDs, Host API target IDs, power
-segmentation, and real synchronization performance are also configurable and
-`NOT HARDWARE VERIFIED`.
+all supplies/controllers require a common ground. This electrical plan, site
+endpoint assignment, power segmentation, and real synchronization performance
+remain configurable and `NOT HARDWARE VERIFIED`.
 
 ## Architectural invariants
 
 - Analysis and effects are hardware-agnostic.
 - Effects produce logical frames; physical mapping produces node frames.
 - One logical frame owns one shared sequence and media timestamp.
+- A newly opened UDP v3 Host session marks only sequence 1 as `KEY_FRAME`;
+  Host pre-encodes every node before sending, then sends three byte-identical
+  per-node rounds with one apply/media identity at 2 ms spacing. Firmware may
+  reset committed sequence only for that exact pair and treats redundant
+  copies idempotently. Successful KEY preparation admits the session. A later
+  timed-output failure rolls back physically but keeps that admission so the
+  next complete scheduled frame can recover without a blind late retry.
 - RS-485 and UDP use that same sequence.
 - Protocol codecs are pure and testable without hardware.
 - Production transport failures must be explicit; never silently fall back to memory and report success.
@@ -107,11 +134,37 @@ UDP v2 is the implemented legacy codec: one `pixel_count` and one continuous
 RGB pixel payload per ESP32 node, with version, node ID, sequence, payload
 length, and CRC32. Its codec, tests, and golden vectors remain unchanged.
 
-UDP v3 is the target multi-output protocol introduced in Phase 26. It carries
-one complete node frame with independent per-output lengths/payloads. Separate
-strips must not be represented as one electrically concatenated strip; the
-ESP32 applies every output and refreshes once per logical frame. New cabin
-production profiles default to v3 after Phase 26, while v2 remains legacy.
+UDP v3 is the target protocol introduced in Phase 26. Its general contract
+continues to carry one complete node frame with one to three independent output
+descriptors and payloads. Phase 31 production profiles use exactly one output
+descriptor per ESP32-S3 (`output_id: 1`, GPIO4); this topology rule does not
+narrow the codec or firmware protocol capability. Separate strips must not be
+represented as one electrically concatenated strip. New cabin production
+profiles use v3, while v2 remains legacy.
+
+Phase 31 production presentation is scheduled. The Host broadcasts its
+monotonic clock, assigns one shared `apply_at_us = host_monotonic_us + 20 ms`
+to every UDP v3 node packet for a logical frame, and sets `SCHEDULED_APPLY`.
+Each ESP32 estimates `local_monotonic_us - host_monotonic_us` from the minimum
+offset in a bounded beacon window, prepares the complete strip frame without
+touching GPIO, and starts its fixed GPIO4 SPI transaction early enough for the
+common `apply_at_us` to mean guaranteed WS2811 latch completion. The fixed
+GPIO4 production candidate uses 3.2 MHz four-bit `1000`/`1100` encoding with
+symmetric 200-byte (500 us) low guards. Complete wire times are 1300 us for 10
+groups, 1600 us for 20 groups, and 2200 us for 40 groups. This output candidate
+remains **NOT HARDWARE VERIFIED**.
+
+All production `esp32-s3-node-N` images require scheduled frames. Explicit
+legacy Node 2 diagnostic images retain immediate application and are not
+strict-synchronization evidence. The Host/firmware scheduling contract is
+software implemented, but actual cross-node latch skew remains **NOT HARDWARE
+VERIFIED** until powered nodes are measured with a logic analyzer.
+
+The firmware output task checks safe timeout on every loop, including under a
+continuous scheduled queue. A scheduled SPI failure must not blindly repeat a
+full wire transaction after the validated start deadline; it fails closed and
+recovers locally. Immediate diagnostic output may retain its explicit retry
+behavior.
 
 Keep protocol golden vectors shared between host and firmware documentation/tests.
 
@@ -142,8 +195,8 @@ All Python commands must begin with:
 `.\\.python\\Scripts\\python.exe`
 
 Before the first Python command in each Claude Code session, verify the interpreter.
-Codex on Windows may remap the repository into a sandbox path such as
-`C:\Users\CodexSandboxOffline\.codex\.sandbox\cwd\<sandbox-id>`, so do not
+Codex on Windows may remap the repository into a sandbox-local path such as
+`<sandbox-home>\.codex\.sandbox\cwd\<sandbox-id>`, so do not
 require `sys.executable` to contain the original drive path or repository
 directory name.
 
@@ -176,7 +229,26 @@ If firmware projects exist or are added:
 
 `pio run -d firmware/stm32_rgbcct_node`
 
-`pio run -d firmware/esp32_ws2811_node`
+For ESP32-S3 on Windows, run the native firmware tests with the repository
+MSVC wrapper so build and temporary files remain project-local:
+
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File firmware/esp32_ws2811_node/scripts/run_native_tests_msvc.ps1`
+
+On a host that already provides `gcc` and `g++`, the equivalent command is
+`pio test -d firmware/esp32_ws2811_node -e native`.
+
+Then build every production image in Node order with a low-concurrency,
+sequential PowerShell loop:
+
+`1..13 | ForEach-Object { pio run -j 2 -d firmware/esp32_ws2811_node -e "esp32-s3-node-$_"; if ($LASTEXITCODE -ne 0) { throw "ESP32 Node $_ build failed with exit code $LASTEXITCODE" } }`
+
+Before either ESP32 command, confirm `pio` is on A: and set
+`PLATFORMIO_CORE_DIR`, `PLATFORMIO_PLATFORMS_DIR`,
+`PLATFORMIO_PACKAGES_DIR`, `PLATFORMIO_CACHE_DIR`, `TEMP`, `TMP`, and `TMPDIR`
+to the project-local `firmware/esp32_ws2811_node/.pio` paths documented in the
+firmware README. Do not build the 13 environments concurrently; sequential
+builds reduce memory and Windows paging pressure, while all project cache and
+temporary files stay on A:.
 
 Show commands and results. Never delete or weaken tests just to pass.
 

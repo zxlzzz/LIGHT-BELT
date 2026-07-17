@@ -1,0 +1,48 @@
+# Restricted emergency A/B: exact raw states after the identity transform.
+# 32/255, 16/255, and 8/255 are written as exact decimal constants below.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-emergency-node2-strip41-110s"
+  duration: 110.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "warm-two-level-pulse"
+      start: 5.0
+      end: 35.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "step_pulse"
+        params:
+          period: 4.0
+          low_color: [0.12549019607843137, 0.03137254901960784, 0.0]
+          high_color: [0.12549019607843137, 0.06274509803921569, 0.0]
+      color: {mode: "effect_default"}
+
+    - id: "blue-single-dot-flow"
+      start: 40.0
+      end: 70.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: {mode: "solid", color: [0.0, 0.0, 0.12549019607843137]}
+
+    - id: "orange-single-dot-flow"
+      start: 75.0
+      end: 105.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: {mode: "solid", color: [0.12549019607843137, 0.03137254901960784, 0.0]}

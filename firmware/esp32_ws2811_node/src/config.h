@@ -3,6 +3,18 @@
 
 #include "config.example.h"
 
+#if defined(LIGHT_BELT_CONTENT_DEDUPE_AB) && \
+    defined(LIGHT_BELT_EMERGENCY_CHANGE_ONLY_AB)
+#error "unrestricted content dedupe and emergency policy are separate A/B modes"
+#endif
+
+// Hardware commissioning overrides must be explicit per PlatformIO
+// environment. The shared default remains unchanged for every other node.
+#if defined(LIGHT_BELT_WS2811_RGB_OVERRIDE)
+#undef WS2811_COLOR_ORDER
+#define WS2811_COLOR_ORDER WS2811_COLOR_ORDER_RGB
+#endif
+
 #if __has_include("config.local.h")
 #define HAS_LOCAL_CONFIG 1
 #include "config.local.h"
@@ -46,6 +58,19 @@
 #include "node_configs/node_13.h"
 #else
 #error "LIGHT_BELT_NODE_CONFIG must be an integer from 1 through 13"
+#endif
+
+#if defined(LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US)
+#if !defined(LIGHT_BELT_CONTENT_DEDUPE_AB)
+#error "host write offset requires unrestricted content dedupe A/B"
+#endif
+#if LIGHT_BELT_NODE_CONFIG != 8
+#error "host write offset A/B is scoped to Node 8"
+#endif
+#if LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US < 1 || \
+    LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US > 30000
+#error "host write offset must be between 1 and 30000 us"
+#endif
 #endif
 
 #endif

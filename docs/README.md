@@ -15,6 +15,7 @@ directory defines its lifecycle; filenames alone do not determine authority.
 - [Cabin Lighting V3 operator guide](current/cabin-lighting-v3-operator-guide.md)
 - [ESP32 Windows commissioning](current/esp32-windows-commissioning.md)
 - [Show v2 authoring](current/show-v2-authoring.md)
+- [WS2811 show stability investigation](current/ws2811-show-stability-investigation.md)
 
 ## Reference
 
@@ -25,7 +26,7 @@ directory defines its lifecycle; filenames alone do not determine authority.
 
 ## Acceptance
 
-- [Cabin Lighting V3 software acceptance](acceptance/cabin-lighting-v3-software-acceptance.md)
+- [Cabin Lighting V3 Phase 31 software acceptance](acceptance/cabin-lighting-v3-phase31-software-acceptance.md)
 - [Authoring modulation v1 software acceptance](acceptance/authoring-modulation-v1-software-acceptance.md)
 - [Show orchestration v1 software acceptance](acceptance/show-orchestration-v1-software-acceptance.md)
 - [Hardware acceptance checklist](acceptance/hardware-acceptance-checklist.md)
@@ -41,6 +42,10 @@ completed with real evidence.
 completed campaign instructions. Historical files may intentionally contain
 old paths, RGBW terminology, deprecated commands, or measurements captured at
 the time. They are evidence, not current instructions.
+
+The superseded five-controller Phase 29 report is retained at
+`history/acceptance/cabin-lighting-v3-phase29-software-acceptance.md`; it does
+not describe the Phase 31 production topology.
 
 See [Repository Governance](repository-governance.md) for lifecycle and cleanup
 rules.

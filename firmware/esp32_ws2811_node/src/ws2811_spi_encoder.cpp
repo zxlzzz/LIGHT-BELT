@@ -23,24 +23,23 @@ bool validColorOrder(Ws2811ColorOrder color_order) {
          color_order == Ws2811ColorOrder::GRB;
 }
 
-}  // namespace
-
-size_t ws2811SpiFrameSize(uint16_t group_count) {
+size_t frameSizeWithGuard(uint16_t group_count, size_t guard_bytes) {
   if (group_count == 0 || group_count > MAX_PIXELS_PER_OUTPUT) {
     return 0;
   }
-  return 2U * WS2811_SPI_GUARD_BYTES +
+  return 2U * guard_bytes +
          static_cast<size_t>(group_count) * WS2811_SPI_BYTES_PER_GROUP;
 }
 
-bool encodeWs2811Spi(
+bool encodeWithGuard(
     const RgbPixel *pixels,
     uint16_t group_count,
     Ws2811ColorOrder color_order,
+    size_t guard_bytes,
     uint8_t *destination,
     size_t destination_capacity,
     size_t *encoded_len) {
-  const size_t required = ws2811SpiFrameSize(group_count);
+  const size_t required = frameSizeWithGuard(group_count, guard_bytes);
   if (pixels == nullptr || destination == nullptr || encoded_len == nullptr ||
       required == 0 || destination_capacity < required ||
       !validColorOrder(color_order)) {
@@ -48,7 +47,7 @@ bool encodeWs2811Spi(
   }
 
   memset(destination, 0, required);
-  size_t cursor = WS2811_SPI_GUARD_BYTES;
+  size_t cursor = guard_bytes;
   for (uint16_t pixel = 0; pixel < group_count; ++pixel) {
     const uint8_t channels_rgb[] = {
         pixels[pixel].r,
@@ -67,9 +66,93 @@ bool encodeWs2811Spi(
       cursor += 4;
     }
   }
-  // The pre-filled zero tail is the low reset/guard interval.
   *encoded_len = required;
   return true;
+}
+
+bool uniformEncodedGroupsWithGuard(
+    const uint8_t *encoded,
+    size_t encoded_len,
+    uint16_t group_count,
+    size_t guard_bytes) {
+  if (encoded == nullptr ||
+      encoded_len != frameSizeWithGuard(group_count, guard_bytes)) {
+    return false;
+  }
+  const uint8_t *first = encoded + guard_bytes;
+  for (uint16_t group = 1; group < group_count; ++group) {
+    const uint8_t *candidate =
+        first + static_cast<size_t>(group) * WS2811_SPI_BYTES_PER_GROUP;
+    if (memcmp(first, candidate, WS2811_SPI_BYTES_PER_GROUP) != 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+}  // namespace
+
+size_t ws2811SpiFrameSize(uint16_t group_count) {
+  return frameSizeWithGuard(group_count, WS2811_SPI_GUARD_BYTES);
+}
+
+size_t ws2811FixedGpio4SpiFrameSize(uint16_t group_count) {
+  return frameSizeWithGuard(
+      group_count, WS2811_FIXED_GPIO4_SPI_GUARD_BYTES);
+}
+
+bool encodeWs2811Spi(
+    const RgbPixel *pixels,
+    uint16_t group_count,
+    Ws2811ColorOrder color_order,
+    uint8_t *destination,
+    size_t destination_capacity,
+    size_t *encoded_len) {
+  return encodeWithGuard(
+      pixels, group_count, color_order, WS2811_SPI_GUARD_BYTES, destination,
+      destination_capacity, encoded_len);
+}
+
+bool encodeWs2811FixedGpio4Spi(
+    const RgbPixel *pixels,
+    uint16_t group_count,
+    Ws2811ColorOrder color_order,
+    uint8_t *destination,
+    size_t destination_capacity,
+    size_t *encoded_len) {
+  return encodeWithGuard(
+      pixels, group_count, color_order,
+      WS2811_FIXED_GPIO4_SPI_GUARD_BYTES, destination,
+      destination_capacity, encoded_len);
+}
+
+uint32_t ws2811EncodedHash(const uint8_t *encoded, size_t encoded_len) {
+  if (encoded == nullptr || encoded_len == 0) {
+    return 0;
+  }
+  uint32_t hash = 2166136261U;
+  for (size_t index = 0; index < encoded_len; ++index) {
+    hash ^= encoded[index];
+    hash *= 16777619U;
+  }
+  return hash;
+}
+
+bool ws2811UniformEncodedGroups(
+    const uint8_t *encoded,
+    size_t encoded_len,
+    uint16_t group_count) {
+  return uniformEncodedGroupsWithGuard(
+      encoded, encoded_len, group_count, WS2811_SPI_GUARD_BYTES);
+}
+
+bool ws2811FixedGpio4SpiUniformEncodedGroups(
+    const uint8_t *encoded,
+    size_t encoded_len,
+    uint16_t group_count) {
+  return uniformEncodedGroupsWithGuard(
+      encoded, encoded_len, group_count,
+      WS2811_FIXED_GPIO4_SPI_GUARD_BYTES);
 }
 
 }  // namespace light_belt

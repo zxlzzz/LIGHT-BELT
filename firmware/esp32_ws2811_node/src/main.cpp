@@ -20,16 +20,11 @@
 #if defined(LIGHT_BELT_GPIO5_SPI3BIT_DIAGNOSTIC)
 #include "ws2811_spi3_encoder.h"
 #endif
-#if defined(LIGHT_BELT_GPIO5_SPI6BIT_DIAGNOSTIC)
-#include "ws2811_spi6_encoder.h"
-#endif
-#if defined(LIGHT_BELT_FASTLED_NODE2_DIAGNOSTIC)
-constexpr const char *kBackendName = "fastled_rmt4_builtin_gpio4_gpio5_diagnostic";
-constexpr uint32_t kBackendClockHz = 800000;
-#elif defined(LIGHT_BELT_GPIO5_RMT_DIAGNOSTIC)
+#if defined(LIGHT_BELT_GPIO5_RMT_DIAGNOSTIC)
 #include "ws2811_rmt_encoder.h"
 #endif
 #include "ws2811_spi_encoder.h"
+#include "ws2811_spi6_encoder.h"
 
 namespace {
 
@@ -41,6 +36,8 @@ struct QueuedNodeFrame {
   light_belt::OwnedNodeFrame frame;
   uint32_t session_generation;
   uint64_t local_deadline_us;
+  bool allow_sequence_reset;
+  bool admission_only;
 };
 
 QueueHandle_t frame_queue = nullptr;
@@ -55,8 +52,21 @@ constexpr uint32_t kWifiRetryMs = 10000;
 constexpr uint32_t kSafeRetryMs = 100;
 constexpr uint32_t kOutputPollMs = 20;
 constexpr uint64_t kScheduledLateToleranceUs = 2000;
+constexpr uint64_t kSessionRecoveryHostWindowUs = 2000000;
 constexpr uint64_t kFinalScheduleSpinUs = 250;
-#if defined(LIGHT_BELT_FASTLED_NODE2_DIAGNOSTIC)
+#if defined(LIGHT_BELT_EMERGENCY_CHANGE_ONLY_AB)
+static_assert(OUTPUT_COUNT == 1, "emergency A/B requires one output");
+static_assert(OUTPUT_0_ID == 1, "emergency A/B requires output 1");
+static_assert(OUTPUT_0_GPIO == 4, "emergency A/B requires GPIO4");
+static_assert(
+    OUTPUT_0_PIXELS >= 2 &&
+        OUTPUT_0_PIXELS <= light_belt::MAX_PIXELS_PER_OUTPUT,
+    "emergency A/B requires 2..MAX groups");
+#endif
+#if defined(LIGHT_BELT_FASTLED_GPIO4_IMMEDIATE_AB)
+constexpr const char *kBackendName = "fastled_rmt4_builtin_gpio4_immediate_ab";
+constexpr uint32_t kBackendClockHz = 800000;
+#elif defined(LIGHT_BELT_FASTLED_NODE2_DIAGNOSTIC)
 constexpr const char *kBackendName = "fastled_rmt4_builtin_gpio4_gpio5_diagnostic";
 constexpr uint32_t kBackendClockHz = 800000;
 #elif defined(LIGHT_BELT_GPIO5_RMT_DIAGNOSTIC)
@@ -87,7 +97,8 @@ constexpr uint32_t kBackendClockHz = light_belt::WS2811_SPI_CLOCK_HZ;
 constexpr const char *kBackendName = "spi_dma_fixed_gpio4_diagnostic";
 constexpr uint32_t kBackendClockHz = light_belt::WS2811_SPI_CLOCK_HZ;
 #elif defined(LIGHT_BELT_FIXED_GPIO4_SPI)
-constexpr const char *kBackendName = "spi_dma_fixed_gpio4";
+constexpr const char *kBackendName =
+    "spi4_dma_fixed_gpio4_500us_candidate_not_hardware_verified";
 constexpr uint32_t kBackendClockHz = light_belt::WS2811_SPI_CLOCK_HZ;
 #else
 constexpr const char *kBackendName = "spi_dma";
@@ -117,7 +128,31 @@ void printStartupIdentity() {
     Serial.printf("node_output id=%u gpio=%u groups=%u\n", output.output_id,
                   output.gpio, output.pixel_count);
   }
-#if defined(LIGHT_BELT_FASTLED_NODE2_DIAGNOSTIC)
+#if defined(LIGHT_BELT_EMERGENCY_CHANGE_ONLY_AB)
+  Serial.printf(
+      "node_emergency change_only=1 presentation=immediate exact_groups=%u "
+      "group0=black whitelist=blue20_dot,orange20_08_dot,"
+      "green20_dot,blue20_theater,green20_uniform,"
+      "orange20_08_uniform,orange20_10_uniform,black\n",
+      OUTPUT_0_PIXELS);
+#endif
+#if defined(LIGHT_BELT_CONTENT_DEDUPE_AB)
+  Serial.println(
+      "node_content_dedupe unrestricted=1 exact_pixel_payload=1 "
+      "key_forces_write=1 safe_forces_write=1 min_change_interval_ms=0");
+#endif
+#if defined(LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US)
+  Serial.printf(
+      "node_content_dedupe_offset immediate_host_physical_write_us=%lu "
+      "non_skip=1 key_safe=1 scheduled=0 startup_watchdog_recovery=0\n",
+      static_cast<unsigned long>(
+          LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US));
+#endif
+#if defined(LIGHT_BELT_FASTLED_GPIO4_IMMEDIATE_AB)
+  Serial.println(
+      "node_timing transport=fastled_rmt4_builtin ws_hz=800000 "
+      "gpio4=enabled scheduled=disabled brightness=255 dither=0");
+#elif defined(LIGHT_BELT_FASTLED_NODE2_DIAGNOSTIC)
   Serial.println(
       "node_timing transport=fastled_rmt4_builtin ws_hz=800000 "
       "gpio4=enabled gpio5=enabled gpio6=disabled brightness=255 dither=0");
@@ -145,10 +180,21 @@ void printStartupIdentity() {
       "gpio5_hz=%lu gpio5_bits_per_ws=3\n",
       static_cast<unsigned long>(light_belt::WS2811_SPI_CLOCK_HZ),
       static_cast<unsigned long>(light_belt::WS2811_SPI3_CLOCK_HZ));
+#elif defined(LIGHT_BELT_FIXED_GPIO4_SPI) && \
+    !defined(LIGHT_BELT_FIXED_GPIO4_DIAGNOSTIC)
+  Serial.printf(
+      "node_timing gpio4_transport=spi2 gpio4_hz=%lu "
+      "gpio4_bits_per_ws=4 gpio4_zero=1000 gpio4_one=1100 "
+      "gpio4_t0h_ns_x10=3125 gpio4_t1h_ns=625 "
+      "gpio4_reset_low_us=%lu routing=permanent "
+      "verification=not_hardware_verified\n",
+      static_cast<unsigned long>(light_belt::WS2811_SPI_CLOCK_HZ),
+      static_cast<unsigned long>(
+          light_belt::WS2811_FIXED_GPIO4_SPI_RESET_LOW_US));
 #elif defined(LIGHT_BELT_FIXED_GPIO4_SPI)
   Serial.printf(
       "node_timing gpio4_transport=spi2 gpio4_hz=%lu "
-      "gpio4_bits_per_ws=4 routing=permanent\n",
+      "gpio4_bits_per_ws=4 routing=permanent diagnostic=legacy\n",
       static_cast<unsigned long>(light_belt::WS2811_SPI_CLOCK_HZ));
 #endif
 }
@@ -384,6 +430,31 @@ void networkTask(void *) {
 
     const bool scheduled =
         (parsed.flags & light_belt::UDP_V3_FLAG_SCHEDULED_APPLY) != 0;
+    light_belt::OwnedNodeFrame owned{};
+    if (!light_belt::copyUdpV3Frame(parsed, led_output.descriptors(),
+                                    led_output.outputCount(), &owned)) {
+      runtime_stats.state_rejected.fetch_add(1);
+      continue;
+    }
+#if defined(LIGHT_BELT_EMERGENCY_CHANGE_ONLY_AB)
+    const light_belt::EmergencyOutputPolicy emergency_policy = {
+        NODE_ID, led_output.descriptors()[0]};
+    if (!light_belt::isEmergencyFrameAllowed(owned, emergency_policy)) {
+      const uint32_t rejected =
+          runtime_stats.emergency_payload_rejected.fetch_add(1) + 1U;
+      runtime_stats.state_rejected.fetch_add(1);
+      Serial.printf(
+          "emergency_payload_rejected sequence=%lu count=%lu\n",
+          static_cast<unsigned long>(owned.sequence),
+          static_cast<unsigned long>(rejected));
+      continue;
+    }
+#endif
+    const bool session_start = light_belt::isSessionStartFrame(owned);
+    const bool duplicate_session_start =
+        scheduled && session_start && has_scheduled_session_identity &&
+        owned.apply_at_us == last_session_apply_at_us &&
+        owned.media_timestamp_us == last_session_media_timestamp_us;
     uint64_t local_deadline_us = 0;
     if (scheduled) {
       const uint64_t local_now_us =
@@ -413,6 +484,69 @@ void networkTask(void *) {
             runtime_stats.scheduled_invalid_dropped.fetch_add(1);
             break;
         }
+        const bool recoverable_session_start =
+            light_belt::isSessionRecoveryEligible(
+                owned, deadline.result, deadline.clock_status,
+                presentation_clock.lastHostMonotonicUs(),
+                kSessionRecoveryHostWindowUs);
+        if (recoverable_session_start) {
+          if (duplicate_session_start) {
+            runtime_stats.session_key_duplicates.fetch_add(1);
+          }
+
+          const bool generation_already_admitted =
+              duplicate_session_start &&
+              light_belt::isSessionGenerationAdmitted(
+                  rx_session_generation,
+                  prepared_session_generation.load(),
+                  committed_session_generation.load());
+          if (!generation_already_admitted) {
+            uint32_t candidate_generation = rx_session_generation;
+            uint32_t previous_announced_generation =
+                announced_session_generation.load();
+            const bool starts_distinct_session = !duplicate_session_start;
+            if (starts_distinct_session) {
+              ++candidate_generation;
+              if (candidate_generation == 0) {
+                candidate_generation = 1;
+              }
+              announced_session_generation.store(candidate_generation);
+              if (xQueueReset(frame_queue) != pdPASS) {
+                announced_session_generation.store(
+                    previous_announced_generation);
+                continue;
+              }
+            }
+
+            // Preparation-only admission preserves the authoritative KEY
+            // boundary. OutputTask encodes this complete KEY, records the
+            // prepared generation, then cancels it without touching GPIO.
+            const QueuedNodeFrame admission_candidate = {
+                owned, candidate_generation, 0, false, true};
+            const bool overwrote = uxQueueMessagesWaiting(frame_queue) != 0;
+            if (xQueueOverwrite(frame_queue, &admission_candidate) != pdPASS) {
+              if (starts_distinct_session) {
+                announced_session_generation.store(
+                    previous_announced_generation);
+              }
+              continue;
+            }
+            if (overwrote) {
+              runtime_stats.queue_overwritten.fetch_add(1);
+            }
+            runtime_stats.frames_queued.fetch_add(1);
+            runtime_stats.scheduled_queued.fetch_add(1);
+            runtime_stats.last_received_sequence.store(owned.sequence);
+            rx_session_generation = candidate_generation;
+            last_rx_sequence = owned.sequence;
+            has_rx_sequence = true;
+            if (starts_distinct_session) {
+              has_scheduled_session_identity = true;
+              last_session_apply_at_us = owned.apply_at_us;
+              last_session_media_timestamp_us = owned.media_timestamp_us;
+            }
+          }
+        }
         continue;
       }
       local_deadline_us = deadline.local_deadline_us;
@@ -425,19 +559,15 @@ void networkTask(void *) {
 #endif
     }
 
-    light_belt::OwnedNodeFrame owned{};
-    if (!light_belt::copyUdpV3Frame(parsed, led_output.descriptors(),
-                                    led_output.outputCount(), &owned)) {
-      runtime_stats.state_rejected.fetch_add(1);
-      continue;
-    }
-    const bool session_start = light_belt::isSessionStartFrame(owned);
-    if (scheduled && session_start && has_scheduled_session_identity &&
-        owned.apply_at_us == last_session_apply_at_us &&
-        owned.media_timestamp_us == last_session_media_timestamp_us) {
+    const bool duplicate_generation_admitted =
+        duplicate_session_start &&
+        light_belt::isSessionGenerationAdmitted(
+            rx_session_generation,
+            prepared_session_generation.load(),
+            committed_session_generation.load());
+    if (duplicate_generation_admitted) {
       // The Host intentionally repeats the same scheduled KEY frame. Once one
-      // copy is queued, later identical copies are delivery redundancy, not
-      // new sessions and must not reset the output generation again.
+      // copy is prepared, later identical copies are delivery redundancy.
       runtime_stats.session_key_duplicates.fetch_add(1);
       continue;
     }
@@ -453,21 +583,26 @@ void networkTask(void *) {
 
     uint32_t candidate_generation = rx_session_generation;
     if (session_start) {
-      ++candidate_generation;
-      if (candidate_generation == 0) {
-        candidate_generation = 1;
+      if (duplicate_session_start) {
+        runtime_stats.session_key_duplicates.fetch_add(1);
+      } else {
+        ++candidate_generation;
+        if (candidate_generation == 0) {
+          candidate_generation = 1;
+        }
+        // Announce first so an old item already taken by outputTask cannot
+        // pass its generation check after this new session is observed.
+        const uint32_t previous_announced_generation =
+            announced_session_generation.load();
+        announced_session_generation.store(candidate_generation);
+        if (xQueueReset(frame_queue) != pdPASS) {
+          announced_session_generation.store(previous_announced_generation);
+          runtime_stats.state_rejected.fetch_add(1);
+          continue;
+        }
       }
-      // Announce first so an old item already taken by outputTask cannot pass
-      // its generation check after this new session has been observed.
-      const uint32_t previous_announced_generation =
-          announced_session_generation.load();
-      announced_session_generation.store(candidate_generation);
-      if (xQueueReset(frame_queue) != pdPASS) {
-        announced_session_generation.store(previous_announced_generation);
-        runtime_stats.state_rejected.fetch_add(1);
-        continue;
-      }
-    } else if (!light_belt::isSessionGenerationAdmitted(
+    } else if (light_belt::requiresAdmittedSession(owned) &&
+               !light_belt::isSessionGenerationAdmitted(
                    rx_session_generation,
                    prepared_session_generation.load(),
                    committed_session_generation.load())) {
@@ -477,8 +612,17 @@ void networkTask(void *) {
       continue;
     }
 
+    const uint32_t prepared_generation =
+        prepared_session_generation.load();
+    const uint32_t committed_generation =
+        committed_session_generation.load();
+    const bool allow_sequence_reset =
+        !session_start && candidate_generation != 0 &&
+        prepared_generation == candidate_generation &&
+        committed_generation != candidate_generation;
     const QueuedNodeFrame queued = {
-        owned, candidate_generation, local_deadline_us};
+        owned, candidate_generation, local_deadline_us,
+        allow_sequence_reset, false};
     const bool overwrote = uxQueueMessagesWaiting(frame_queue) != 0;
     if (xQueueOverwrite(frame_queue, &queued) != pdPASS) {
       runtime_stats.state_rejected.fetch_add(1);
@@ -531,14 +675,52 @@ void outputTask(void *) {
         revokePreparedSession(candidate);
         continue;
       }
+      if (candidate.admission_only) {
+        if (!led_output.supportsScheduledApply() ||
+            !led_output.prepareFrame(candidate.frame)) {
+          runtime_stats.state_rejected.fetch_add(1);
+          runtime_stats.scheduled_invalid_dropped.fetch_add(1);
+          led_output.cancelPrepared();
+          revokePreparedSession(candidate);
+          continue;
+        }
+        prepared_session_generation.store(candidate.session_generation);
+        led_output.cancelPrepared();
+        continue;
+      }
       runtime_stats.refresh_attempts.fetch_add(1);
       const uint32_t errors_before = runtime_stats.output_errors.load();
       bool accepted = false;
       if (candidate.local_deadline_us == 0) {
+#if defined(LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US)
+        bool ready = led_output.prepareFrame(candidate.frame);
+        bool offset_applied = false;
+        if (ready && led_output.physicalWritePending()) {
+          runtime_stats.physical_offset_waits.fetch_add(1);
+          offset_applied = true;
+          const uint64_t offset_start_us =
+              static_cast<uint64_t>(esp_timer_get_time()) +
+              LIGHT_BELT_CONTENT_DEDUPE_HOST_WRITE_OFFSET_US;
+          ready = waitForTransmitStart(
+              offset_start_us, candidate.session_generation);
+        }
+        ready = ready && candidate.session_generation ==
+                             announced_session_generation.load();
+        if (ready) {
+          accepted = led_output.transmitPrepared(millis());
+        } else {
+          if (offset_applied) {
+            runtime_stats.physical_offset_cancelled.fetch_add(1);
+          }
+          led_output.cancelPrepared();
+        }
+#else
         accepted = led_output.acceptFrame(candidate.frame, millis());
+#endif
       } else {
         if (!led_output.supportsScheduledApply() ||
-            !led_output.prepareFrame(candidate.frame)) {
+            !led_output.prepareFrame(
+                candidate.frame, candidate.allow_sequence_reset)) {
           if (runtime_stats.output_errors.load() == errors_before) {
             runtime_stats.state_rejected.fetch_add(1);
           }
@@ -643,7 +825,11 @@ void printStats() {
       "scheduled_start_late=%u scheduled_cancelled=%u session_key_dupes=%u "
       "deadline_error_us=%ld immediate_dropped=%u queued=%u "
       "queue_overwritten=%u rx_gaps=%u display_gaps=%u attempts=%u "
-      "refresh_ok=%u spi_ok=%u output_errors=%u invariant_errors=%u "
+      "refresh_ok=%u identical_skipped=%u emergency_rejected=%u "
+      "physical_offset_waits=%u physical_offset_cancelled=%u "
+      "spi_ok=%u encoded_hash_checks=%u "
+      "encoded_hash_mismatches=%u uniform_checks=%u "
+      "uniform_mismatches=%u output_errors=%u invariant_errors=%u "
       "rollback_ok=%u "
       "safe_frames=%u timeout_black=%u wifi_reconnects=%u "
       "net_config_errors=%u ip_mismatches=%u udp_bind_errors=%u "
@@ -675,7 +861,15 @@ void printStats() {
       runtime_stats.rx_sequence_gaps.load(),
       runtime_stats.display_sequence_gaps.load(),
       runtime_stats.refresh_attempts.load(), runtime_stats.refresh_ok.load(),
+      runtime_stats.identical_skipped.load(),
+      runtime_stats.emergency_payload_rejected.load(),
+      runtime_stats.physical_offset_waits.load(),
+      runtime_stats.physical_offset_cancelled.load(),
       runtime_stats.spi_transactions_ok.load(),
+      runtime_stats.encoded_hash_checks.load(),
+      runtime_stats.encoded_hash_mismatches.load(),
+      runtime_stats.uniform_frame_checks.load(),
+      runtime_stats.uniform_frame_mismatches.load(),
       runtime_stats.output_errors.load(), runtime_stats.invariant_errors.load(),
       runtime_stats.rollback_ok.load(),
       runtime_stats.safe_frames.load(), runtime_stats.timeout_black.load(),
@@ -724,9 +918,24 @@ void setup() {
 
 void loop() {
   static uint32_t last_stats_ms = 0;
+  static bool startup_identity_seen_on_connected_serial = false;
+  static bool first_stats_emitted = false;
   const uint32_t now_ms = millis();
+  if (static_cast<bool>(Serial) &&
+      !startup_identity_seen_on_connected_serial) {
+    printStartupIdentity();
+    startup_identity_seen_on_connected_serial = true;
+  }
   if (static_cast<uint32_t>(now_ms - last_stats_ms) >= kStatsIntervalMs) {
+    // USB CDC can re-enumerate after the setup-time banner has already been
+    // discarded. Replay once before the first visible stats line as a
+    // non-blocking fallback for monitors that do not expose connection state.
+    if (!first_stats_emitted &&
+        !startup_identity_seen_on_connected_serial) {
+      printStartupIdentity();
+    }
     printStats();
+    first_stats_emitted = true;
     last_stats_ms = now_ms;
   }
   if (!runtime_ready) {

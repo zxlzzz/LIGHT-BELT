@@ -1,0 +1,54 @@
+# Staged Immediate blue control for Node2/strip41 and Node8/strip42.
+# SAFE is sent by engine shutdown. NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-emergency-two-node-blue-staged-110s"
+  duration: 110.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "node2-only-blue20-forward"
+      start: 5.0
+      end: 35.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: &blue20 {mode: "solid", color: [0.0, 0.0, 0.12549019607843137]}
+
+    - id: "node8-only-blue20-forward"
+      start: 40.0
+      end: 70.0
+      target: {type: "virtual_path", id: "strip42_effect_groups_2_to_20"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: *blue20
+
+    - id: "both-node2-blue20-forward"
+      start: 75.0
+      end: 105.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: *blue20
+
+    - id: "both-node8-blue20-forward"
+      start: 75.0
+      end: 105.0
+      target: {type: "virtual_path", id: "strip42_effect_groups_2_to_20"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: *blue20

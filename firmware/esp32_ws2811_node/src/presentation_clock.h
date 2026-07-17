@@ -9,7 +9,7 @@ namespace light_belt {
 static constexpr uint8_t PRESENTATION_CLOCK_MAX_SAMPLES = 32;
 
 struct PresentationClockConfig {
-  uint8_t window_size = 8;
+  uint8_t window_size = 32;
   uint8_t min_samples = 3;
   uint64_t max_age_us = 2000000;
   uint64_t max_uncertainty_us = 5000;

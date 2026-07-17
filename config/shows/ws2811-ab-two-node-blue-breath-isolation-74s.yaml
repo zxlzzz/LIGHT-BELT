@@ -1,0 +1,54 @@
+# Extended isolation gate for strip41, strip42, and concurrent breath playback.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-ab-two-node-blue-breath-isolation-74s"
+  duration: 74.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "strip41-only-blue-breath"
+      start: 1.0
+      end: 21.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 6.0, min_brightness: 0.20}
+      color: &blue {mode: "solid", color: [0.0, 0.0, 0.65]}
+
+    - id: "strip42-only-blue-breath"
+      start: 22.0
+      end: 42.0
+      target: {type: "digital_strip", id: "strip_42"}
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 6.0, min_brightness: 0.20}
+      color: *blue
+
+    - id: "both-strip41-blue-breath"
+      start: 43.0
+      end: 73.0
+      target: {type: "digital_strip", id: "strip_41"}
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 6.0, min_brightness: 0.20}
+      color: *blue
+
+    - id: "both-strip42-blue-breath"
+      start: 43.0
+      end: 73.0
+      target: {type: "digital_strip", id: "strip_42"}
+      effect:
+        mode: "fixed"
+        id: "breath"
+        params: {period: 6.0, min_brightness: 0.20}
+      color: *blue

@@ -66,6 +66,9 @@ _EFFECT_PARAMETER_KEYS: dict[str, frozenset[str]] = {
         {"density", "fade_time", "color_source", "color", "color_timeline"}
     ),
     "demo": frozenset({"cycle_interval", "effects"}),
+    "step_pulse": frozenset({"period", "low_color", "high_color"}),
+    "single_dot": frozenset({"speed", "direction", "color", "color_timeline"}),
+    "theater_phase": frozenset({"speed", "color", "color_timeline"}),
 }
 
 

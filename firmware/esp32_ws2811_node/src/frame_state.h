@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "owned_frame.h"
+#include "presentation_clock.h"
 
 namespace light_belt {
 
@@ -14,6 +15,86 @@ bool isFrameSequenceAcceptable(
     const OwnedNodeFrame &candidate,
     bool has_previous_sequence,
     uint32_t previous_sequence);
+
+// Scheduled continuation frames depend on an admitted KEY generation.
+// Immediate frames are complete snapshots and may establish receiver state
+// from the first datagram that arrives, even if sequence 1 was lost in UDP.
+bool requiresAdmittedSession(const OwnedNodeFrame &candidate);
+
+struct EmergencyOutputPolicy {
+  uint8_t node_id;
+  OutputDescriptor output;
+};
+
+// An emergency image accepts only the exact physical topology compiled for
+// that node and the bounded payload graph below.
+bool isEmergencyFrameAllowed(
+    const OwnedNodeFrame &candidate,
+    const EmergencyOutputPolicy &policy);
+
+enum class EmergencyPayloadKind : uint8_t {
+  Unknown = 0,
+  Black,
+  WarmLow,
+  WarmHigh,
+  GreenUniform,
+  BlueDot,
+  OrangeDot,
+  GreenDot,
+  BlueTheater,
+};
+
+struct EmergencyPayloadState {
+  EmergencyPayloadKind kind;
+  uint8_t position;
+};
+
+constexpr uint32_t EMERGENCY_MIN_CHANGE_INTERVAL_MS = 150;
+
+EmergencyPayloadState classifyEmergencyPayload(
+    const OwnedNodeFrame &candidate,
+    const EmergencyOutputPolicy &policy);
+bool isEmergencyTransitionAllowed(
+    const OwnedNodeFrame &previous,
+    const OwnedNodeFrame &candidate,
+    const EmergencyOutputPolicy &policy);
+bool isEmergencyChangeIntervalAllowed(
+    uint32_t previous_write_ms,
+    uint32_t candidate_write_ms,
+    bool payload_changed,
+    bool safe_state);
+
+// Physical-payload equality excludes sequence, timestamps, and flags. A skip
+// is permitted only when a prior successful backend write established the
+// command-side cache
+// and no safe-state recovery is pending. A KEY always writes physically so a
+// new Host session can rebuild the command-side cache.
+bool physicalPixelPayloadsEqual(
+    const OwnedNodeFrame &left,
+    const OwnedNodeFrame &right);
+bool canSkipPhysicalRefresh(
+    const OwnedNodeFrame &candidate,
+    const OwnedNodeFrame &last_physical,
+    bool has_last_physical,
+    bool safe_recovery_pending);
+
+// The unrestricted diagnostic also forces SAFE physically. This keeps its
+// exit black independent of an earlier identical command-side cache entry.
+bool canSkipContentDedupeRefresh(
+    const OwnedNodeFrame &candidate,
+    const OwnedNodeFrame &last_physical,
+    bool has_last_physical,
+    bool safe_recovery_pending);
+
+// A session-start packet rejected while the clock is still acquiring may be
+// encoded as a preparation-only admission when it is a complete scheduled KEY
+// with a recent Host deadline. It is then cancelled without touching GPIO.
+bool isSessionRecoveryEligible(
+    const OwnedNodeFrame &candidate,
+    ApplyDeadlineResult deadline_result,
+    PresentationClockStatus clock_status,
+    uint64_t last_host_beacon_us,
+    uint64_t max_host_distance_us);
 
 // Generation zero is the startup sentinel, not an admitted Host session.
 // Once a KEY has been fully prepared, later complete frames may recover the
@@ -46,10 +127,16 @@ class MultiOutputFrameState {
   MultiOutputFrameState(const OutputDescriptor *outputs, uint8_t output_count);
 
   bool configurationValid() const;
-  bool isCandidateAcceptable(const OwnedNodeFrame &candidate) const;
+  bool isCandidateAcceptable(
+      const OwnedNodeFrame &candidate,
+      bool allow_sequence_reset = false) const;
 
-  // Call commitFrame only after every configured physical output succeeded.
-  bool commitFrame(const OwnedNodeFrame &candidate, uint32_t accepted_at_ms);
+  // Call commitFrame only after every configured physical output succeeded,
+  // or after exact equality with a cache established by such a success.
+  bool commitFrame(
+      const OwnedNodeFrame &candidate,
+      uint32_t accepted_at_ms,
+      bool allow_sequence_reset = false);
   // Call commitSafeBlack only after a complete physical black refresh.
   bool commitSafeBlack(uint32_t committed_at_ms);
 

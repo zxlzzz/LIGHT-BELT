@@ -1,0 +1,63 @@
+# Gate 1m Host expansion for the restricted Node2 emergency path.
+# Exact raw colors use the identity transform from the existing emergency
+# profile. Every non-static physical state is held for two 5 FPS frames.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-emergency-node2-strip41-gate1m-120s"
+  duration: 120.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+
+  cues:
+    - id: "blue20-forward-control"
+      start: 5.0
+      end: 25.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: {mode: "solid", color: [0.0, 0.0, 0.12549019607843137]}
+
+    - id: "blue20-theater-phase"
+      start: 30.0
+      end: 50.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "theater_phase"
+        params: {speed: 2.5}
+      color: {mode: "solid", color: [0.0, 0.0, 0.12549019607843137]}
+
+    - id: "green20-static"
+      start: 55.0
+      end: 60.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect: {mode: "fixed", id: "static", params: {}}
+      color: {mode: "solid", color: [0.0, 0.12549019607843137, 0.0]}
+
+    - id: "green20-forward-control"
+      start: 65.0
+      end: 85.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: {mode: "solid", color: [0.0, 0.12549019607843137, 0.0]}
+
+    - id: "orange20-08-forward-control"
+      start: 90.0
+      end: 110.0
+      target: {type: "virtual_path", id: "strip41_effect_groups_2_to_10"}
+      effect:
+        mode: "fixed"
+        id: "single_dot"
+        params: {speed: 2.5, direction: "forward"}
+      color: {mode: "solid", color: [0.12549019607843137, 0.03137254901960784, 0.0]}

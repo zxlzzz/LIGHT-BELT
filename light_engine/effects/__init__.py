@@ -36,6 +36,9 @@ def _register_all() -> None:
     )
     from light_engine.effects.twinkle import TwinkleEffect, validate_twinkle_params
     from light_engine.effects.demo import DemoEffect
+    from light_engine.effects.single_dot import SingleDotEffect
+    from light_engine.effects.step_pulse import StepPulseEffect
+    from light_engine.effects.theater_phase import TheaterPhaseEffect
 
     register_effect("static", StaticEffect)
     register_effect("breath", BreathEffect)
@@ -51,6 +54,9 @@ def _register_all() -> None:
     register_effect("color_wipe", ColorWipeEffect, validate_color_wipe_params)
     register_effect("twinkle", TwinkleEffect, validate_twinkle_params)
     register_effect("demo", DemoEffect)
+    register_effect("step_pulse", StepPulseEffect)
+    register_effect("single_dot", SingleDotEffect)
+    register_effect("theater_phase", TheaterPhaseEffect)
 
 
 # Auto-register on first import

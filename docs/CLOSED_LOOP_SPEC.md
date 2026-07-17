@@ -18,7 +18,7 @@ RK3588 上的 LIGHT-BELT
 └─ 13 条 WS2811 独立输出的完整多输出物理帧生成
         │
         ├─ RS-485 → 1 个可配置 STM32 节点 → RGB+CCT COB zone_32
-        └─ UDP → 5 个暂定 ESP32-S3 节点 → 独立 GPIO → 24V WS2811
+        └─ UDP → 13 个 ESP32-S3 节点 → 每节点 GPIO4 → 24V WS2811
 ```
 
 RK3588 是唯一在线主脑。RK3568 只作为备用、调试或降级主机，本任务不构建 RK3588/RK3568 分布式计算。
@@ -74,25 +74,41 @@ cool_white
 | 92 | `strip_92` | 预留/可拆卸安装运行 | 1 m | 20 |
 | 93 | `strip_93` | 预留/可拆卸安装运行 | 1 m | 20 |
 
-总计 260 个 WS2811 digital groups。每条灯带保持独立数据输出，不得把同一 ESP32 的灯带描述为一条电气串接灯带。每个 ESP32 每个逻辑帧接收一个完整多输出帧，并对其全部输出同步应用后只刷新一次。此同步性能为 `NOT HARDWARE VERIFIED`。
+总计 260 个 WS2811 digital groups。每条灯带保持独立数据输出，不得把多条灯带描述为一条电气串接灯带。Phase 31 生产拓扑中每个 ESP32 只连接一条灯带，每个逻辑帧接收一个完整节点帧并只刷新一次。跨 ESP32 的定时应用软件合同已经实现；真实锁存偏差仍为 `NOT HARDWARE VERIFIED`，必须通过上电和逻辑分析仪验收。
 
-### 2.3 暂定控制器与电气分配
+### 2.3 生产控制器与电气分配
 
-以下五节点分配为 `NOT HARDWARE VERIFIED` 的暂定方案，不是最终接线，必须可配置：
+Phase 31 采用一条灯带一块 ESP32-S3。每个生产节点只有 `output_id: 1`，数据引脚固定为 GPIO4。以下完整 13 节点分配是当前可配置合同；它不是硬件验收证据：
 
-| ESP32 node | GPIO4 | GPIO5 | GPIO6 |
-|---:|---|---|---|
-| 1 | `strip_11` | `strip_21` | `strip_31` |
-| 2 | `strip_41` | `strip_42` | `strip_43` |
-| 3 | `strip_44` | `strip_45` | `strip_93` |
-| 4 | `strip_12` | `strip_91` | `strip_92` |
-| 5 | `strip_22` | 未使用 | 未使用 |
+| ESP32 node | 逻辑灯带 | Groups | Output | GPIO | 现场 IPv4 |
+|---:|---|---:|---:|---:|---|
+| 1 | `strip_11` | 10 | 1 | 4 | `192.168.31.201` |
+| 2 | `strip_41` | 10 | 1 | 4 | `192.168.31.202` |
+| 3 | `strip_44` | 20 | 1 | 4 | `192.168.31.203` |
+| 4 | `strip_12` | 40 | 1 | 4 | `192.168.31.204` |
+| 5 | `strip_22` | 40 | 1 | 4 | `192.168.31.205` |
+| 6 | `strip_21` | 10 | 1 | 4 | `192.168.31.206` |
+| 7 | `strip_31` | 10 | 1 | 4 | `192.168.31.207` |
+| 8 | `strip_42` | 20 | 1 | 4 | `192.168.31.208` |
+| 9 | `strip_91` | 20 | 1 | 4 | `192.168.31.209` |
+| 10 | `strip_92` | 20 | 1 | 4 | `192.168.31.210` |
+| 11 | `strip_43` | 20 | 1 | 4 | `192.168.31.211` |
+| 12 | `strip_45` | 20 | 1 | 4 | `192.168.31.212` |
+| 13 | `strip_93` | 20 | 1 | 4 | `192.168.31.213` |
 
-每条灯带使用独立数据引脚并经过 SN74LVC1T45；24V 灯带电源并联；电平转换器 B 侧使用 5V 逻辑电源；所有电源和控制器必须共地。该电气方案为 `NOT HARDWARE VERIFIED`。最终 GPIO 接线、IP 地址、协议 node ID、Host API target ID、电源分段和实际同步性能均未知、可配置且为 `NOT HARDWARE VERIFIED`。
+当前现场九条灯带只使用节点 `1`、`2`、`4`、`5`、`6`、`7`、`8`、`9`、`10`。节点 `3`、`11`、`12`、`13` 属于完整目标，不得在九节点现场 profile 中伪装为已连接节点。
+
+每条灯带的数据引脚经过该节点自己的 SN74LVC1T45；24V 灯带电源并联；电平转换器 B 侧使用 5V 逻辑电源；所有电源和控制器必须共地。该电气方案、现场地址可达性、电源分段和实际同步性能均为 `NOT HARDWARE VERIFIED`。物理标签、逻辑 ID、协议 node ID、Host API target ID 和 IP 字段仍须分开保存，不得互相推导。
+
+### 2.4 Show 不变与原子切换合同
+
+Show、layout 和效果继续引用稳定的 `strip_*` 逻辑 ID，不包含 ESP32 node、output、GPIO、IP 或固件选择。将一条逻辑灯带从旧控制器输出迁移到独立 ESP32 时，不得通过重写 cue、效果参数、时间线或虚拟路径来补偿物理拓扑；相同逻辑帧在迁移前后必须产生相同的逻辑灯带内容。
+
+现场切换必须在输出禁用并断电的维护窗口中原子完成：所选部署集的固件、标签、数据接线和 Host profile 必须作为一个整体从旧五节点拓扑切到 Phase 31 拓扑。不得让旧多输出固件、新单输出固件、旧 profile 和新接线在一次 live run 中混用。失败时先停止输出，再将 profile、固件集和接线整体回滚。九节点现场验收不得扩展为对缺席节点 3、11、12、13 的验收声明。
 
 ## 3. 当前仓库基线
 
-Phase 29 已完成目标软件架构、UDP v3 多输出固件和软件验收。开始工作前仍必须运行完整测试，不得依赖历史测试数量：
+Phase 30 已完成 Show v2 brightness tracks。Phase 31 将生产物理拓扑迁移为一灯带一节点，同时保留 UDP v3 通用多输出能力。开始工作前仍必须运行完整测试，不得依赖历史测试数量：
 
 ```text
 .\.python\Scripts\python.exe -m pytest -q
@@ -150,7 +166,7 @@ metadata / diagnostics
 
 - `zone_32` 映射到可配置的 RS-485 `node_id`，物理标签 32 不等于强制总线地址。
 - 数字逻辑灯带映射到 `digital_node_id + gpio/output_index + group_count + direction`。
-- 一个 ESP32 节点可以包含最多三条独立输出；每条输出保持自己的边界和 GPIO。
+- UDP v3 通用模型允许一个 ESP32 节点包含一到三条独立输出；Phase 31 生产映射严格使用一条输出，即 `output_id: 1` 和 GPIO4。
 - 数字物理帧必须按节点合并为一个完整多输出帧发送，而不是由各效果直接发送多个 strip 包，也不得拼成一条电气串接灯带。
 - `DigitalStrip` 保持纯逻辑模型，不包含 node ID、host、port、offset、GPIO 或其他物理拓扑；这些信息只进入映射、配置、协议、固件和 `PhysicalFrame` 层。
 
@@ -290,26 +306,51 @@ Byte 15  CRC16 Low
 - 统计必须区分 logical frames、wire packets、drops、errors。
 - 统计必须线程安全且只计数一次。
 
-## 7. UDP v3 与 WS2811 多输出物理帧
+## 7. UDP v3 与 WS2811 节点物理帧
 
 现有 UDP v2 是必须保留的 legacy codec：一个 `pixel_count` 和一个连续 RGB pixel payload。其主机 codec、测试和 `firmware/shared/udp_v2_golden.json` 不得被多输出格式追溯改写。Phase 26 新增 UDP v3 承载以下多输出合同；新舱体生产配置在 Phase 26 后默认使用 v3。
 
 ### 7.1 原子帧原则
 
-每个 ESP32-S3 物理节点每个灯光帧只接收一个完整 UDP 数据报；该数据报保留各独立输出边界：
+每个 ESP32-S3 物理节点每个灯光帧只接收一个完整 UDP 数据报；通用 UDP v3 数据报保留一到三个独立输出边界：
 
 ```text
 一个 node_id
 一个 sequence
-一个完整多输出描述（每个 output 的 GPIO/output index、group count 和 RGB payload）
+一个完整输出描述集合（每个 output 的 GPIO/output index、group count 和 RGB payload）
 一次校验
 ```
 
-初始 v3 不做应用层分片。若某节点输出总量超出配置的单数据报上限，应在配置阶段失败并要求增加 ESP32 节点，而不是运行时发送局部帧。
+初始 v3 不做应用层分片。若某节点输出总量超出配置的单数据报上限，应在配置阶段失败并要求增加 ESP32 节点，而不是运行时发送局部帧。Phase 31 生产节点的 `Output Count` 必须为 1，唯一描述符必须是 `output_id: 1`、GPIO4；这不改变通用 codec 接受一到三个输出的合同。
 
-### 7.2 建议协议
+Phase 31 Host session restart uses UDP v3 `KEY_FRAME`: a newly opened UDP v3
+output marks sequence 1, and firmware may reset committed sequence only for
+that exact flag/sequence pair. All other duplicate or stale sequences remain
+invalid.
 
-可在保持以下字段和语义的前提下优化布局：
+Scheduled sequence 1 is an atomic multi-node start. Host must finish encoding
+every node datagram before any send, then transmit three complete rounds at
+2 ms spacing. For each node the three raw datagrams are byte-identical, and
+every node/round shares the same apply/media identity. Firmware must treat
+repeated KEY packets with that identity idempotently rather than creating new
+session generations. Completing KEY preparation admits that generation;
+non-KEY frames remain rejected before that boundary. If its later timed
+physical transaction fails, the backend restores the previous committed frame
+or black and keeps the generation admitted, because every following frame is
+complete and can recover without replaying an already-expired KEY.
+
+Production presentation is scheduled in the Host monotonic time domain. One
+logical frame owns one common nonzero `apply_at_us`, normally Host monotonic
+time plus 20 ms, and every node datagram sets `SCHEDULED_APPLY`. A separate
+fixed-length UDP v3 clock-beacon message broadcasts beacon sequence and Host
+monotonic microseconds with CRC32. Scheduled flag and nonzero `apply_at_us`
+must appear together; an immediate frame uses neither. Production firmware
+rejects immediate frames, while explicit legacy diagnostic images retain
+immediate application.
+
+### 7.2 当前协议
+
+当前 UDP v3 frame 在保持以下字段和语义的前提下编码：
 
 ```text
 Magic
@@ -318,10 +359,21 @@ Message Type
 Digital Node ID
 Flags
 Sequence（至少uint32）
+Media Timestamp
+Apply At（Host monotonic microseconds）
 Output Count
 Payload Length
 重复 Output Descriptor（GPIO/output index、Group Count、Output Payload Length）
 各输出独立 RGB payload
+CRC32
+```
+
+时钟 beacon 使用独立的固定长度消息，不伪装为灯光帧：
+
+```text
+Magic / Version / Clock Beacon Message Type
+Beacon Sequence
+Host Monotonic Microseconds
 CRC32
 ```
 
@@ -334,7 +386,10 @@ CRC32
 - 新增并文档化 UDP v3 Golden Vector；不得覆盖 UDP v2 Golden Vector。
 - 十三条运行的 group count 与控制器分配来自配置，不能由逻辑 ID 硬编码推导。
 - 配置必须校验每个物理节点是否能放入一个安全 UDP 数据报。
-- 暂定五节点、每节点最多三条独立 GPIO 输出；不得将多个输出压成一个串接像素数组。
+- 通用 UDP v3 保留每节点一到三条独立 GPIO 输出；Phase 31 完整生产拓扑为 13 节点、每节点一条 GPIO4 输出。
+- 同一逻辑帧的所有生产节点数据报必须共享同一个 `apply_at_us`；默认生产提前量为 20 ms。
+- `SCHEDULED_APPLY` 与非零 `apply_at_us` 必须同时存在或同时不存在；不得把零值解释为已调度。
+- Host 必须从同一个单调时钟生成 beacon 和 apply deadline，并通过一个可配置的局域网广播地址周期发送 beacon。
 - 未来可增加多个数字节点而不修改效果层。
 
 ### 7.3 ESP32-S3 固件
@@ -346,15 +401,17 @@ CRC32
 ```text
 Core 0
 ├─ Wi-Fi
-├─ UDP接收
-├─ 长度/版本/CRC/Sequence校验
+├─ UDP帧与Host monotonic clock beacon接收
+├─ 长度/版本/CRC/Sequence/调度语义校验
+├─ 有界窗口 minimum-offset 时钟估计
 └─ 最新完整帧写入长度1队列
 
 Core 1
 ├─ 读取最新帧
-├─ 双缓冲交换
-├─ RMT/可靠硬件后端输出
-└─ 一帧只刷新一次
+├─ 在不触碰GPIO的情况下准备完整编码帧
+├─ 按 apply deadline 减去实际 wire time 等待发送起点
+├─ 固定GPIO4 SPI硬件后端输出
+└─ 物理成功后提交状态，一帧只刷新一次
 ```
 
 约束：
@@ -363,9 +420,16 @@ Core 1
 - 队列长度为1，使用覆盖语义，不积压旧帧。
 - UDP回调/接收任务不得直接调用灯带刷新。
 - GPIO、node_id、每输出 group_count、色序、亮度上限、超时均可配置。
-- 暂定 GPIO4/GPIO5/GPIO6 分配只存在于配置、映射、协议和固件层，且为 `NOT HARDWARE VERIFIED`。
+- Phase 31 生产 GPIO4 分配只存在于配置、映射、协议和固件层；通用固件仍可表达一到三个输出。物理结果为 `NOT HARDWARE VERIFIED`。
+- 生产固件必须要求 scheduled frame；clock 样本不足、过期、不确定、deadline 太晚或太远时必须丢弃并明确计数，不得退化为收到即显示。
+- 时钟估计使用有界样本窗口中的最小 `local_receive_us - host_monotonic_us` 作为 offset，并用窗口极差作为 uncertainty；Host 重启或样本过期后必须可重新获取时钟。
+- 固定 GPIO4 SPI 生产候选后端必须先 `prepare`、再在计算出的发送起点 `transmit`。3.2 MHz 四位编码使用 `0=1000`、`1=1100`，即 T0H/T0L 为 312.5/937.5 ns、T1H/T1L 为 625/625 ns；前后各 200-byte 低电平 guard 均为 500 us。完整 wire time 为：10 groups / 520 bytes / 1300 us，20 groups / 640 bytes / 1600 us，40 groups / 880 bytes / 2200 us。该候选仍为 `NOT HARDWARE VERIFIED`。
+- 公共 `apply_at_us` 表示完整编码事务结束后保证 WS2811 已锁存的时刻；不同长度的节点必须通过上述 wire time 提前启动，而不是同时开始发送。
+- 显式 Node 2 FastLED、QIO、hybrid、GPIO timing 等诊断环境保留 immediate 行为，不属于生产同步合同。
+- output task 每轮循环必须先检查安全超时，即使长度1队列持续有 scheduled frame，也不能让安全黑检查饥饿。
+- scheduled SPI transaction 在已校验的 `tx_start` 失败后不得盲目再发第二个完整事务；它必须恢复已提交帧或安全黑，并保留已完成 KEY preparation 的 session admission，让下一张完整 scheduled frame 恢复。显式 immediate 诊断路径可保留其独立重试语义。
 - 超时后进入可配置安全状态，桌面默认全黑。
-- 串口诊断至少输出收包数、CRC错误、序号间隙、刷新数、超时数。
+- 串口诊断至少输出收包数、CRC错误、序号间隙、beacon/clock readiness、scheduled queue/commit/drop、deadline error、刷新数和超时数。
 - 固件必须能在无实体灯带时编译。
 - 不得声称已通过实体硬件验收，除非提供真实测试证据。
 
@@ -414,6 +478,13 @@ mpv IPC media clock
 - mpv 不存在、IPC不可用或播放器退出时必须明确报错或进入安全状态。
 - 不实现完整图形界面。
 - 提供一个面向 RK3588 的命令或 supervisor 入口，可启动/连接 mpv、运行灯光引擎并在结束时发送安全帧。
+
+媒体时间与展示 deadline 是两个不同维度。效果仍以媒体位置计算；UDP v3
+生产输出另外读取 Host 单调时钟，为一个逻辑帧生成同一
+`apply_at_us = host_monotonic_us + 20000`，并从同一时钟发送广播 beacon。
+ESP32 不把媒体时间当作本地系统时钟，也不使用 wall-clock/UTC 对齐；它只从
+beacon 估算 Host 单调时钟到本地 `esp_timer` 的偏移。该软件机制已经实现，
+真实跨节点锁存性能仍为 `NOT HARDWARE VERIFIED`。
 
 ### 9.2 平台要求
 
@@ -484,7 +555,8 @@ diagnostics
 
 - 协议 Node ID 唯一，且不与物理标签或 Host API target ID 混用。
 - `zone_32` 有合法、可配置的 STM32 RS-485 Node ID。
-- 十三条数字运行均且仅映射到一个独立输出，GPIO 在各 ESP32 节点内不重复。
+- 完整现场 profile `cabin-lighting-v3-site-local.yaml` 的十三条数字运行均且仅映射到一个独立节点；每个节点只有 `output_id: 1`、GPIO4，并匹配 2.3 节的 group count 和现场地址。通用 production-shape template `cabin-lighting-v3-production.yaml` 保持相同节点映射，但有意保留 TEST-NET endpoints 和 RS-485 占位值，不得作为现场 profile 运行。
+- 当前现场 profile 只包含节点 1、2、4、5、6、7、8、9、10 及其九条灯带，不包含未接入节点的占位输出。
 - 单节点完整帧不超过 UDP 上限。
 - 非法配置在启动时失败，错误信息指出配置路径和具体字段。
 - 提供至少两个配置 profile：
@@ -541,13 +613,17 @@ last_success_time
 8. 严格生产模式不静默回退。
 9. UDP v2 legacy roundtrip、Golden Vector、CRC/长度/旧Sequence/超尺寸拒绝。
 10. UDP v3 roundtrip、独立输出边界、CRC/长度/旧 Sequence/未知输出/超尺寸拒绝。
-11. 每个数字节点的独立 GPIO 输出合并为一个完整 UDP v3 多输出物理帧，且边界不丢失。
+11. 通用多输出映射按数字节点合并为一个完整 UDP v3 物理帧且边界不丢失；Phase 31 生产映射对每节点生成且只生成一个 output 1 / GPIO4 描述符。
 12. 多数字节点映射。
 13. 相同逻辑帧的 RS-485 与 UDP 使用相同 Sequence。
 14. 输出健康统计不重复。
 15. fake media clock 的运行、暂停、结束和 seek/reset。
 16. CLI/config smoke tests。
 17. 固件协议常量与主机协议一致，或通过共享生成物/Golden Vector防止漂移。
+18. `SCHEDULED_APPLY` 与 `apply_at_us` 一致性、共享 20 ms apply deadline、clock beacon 编解码/CRC/发送失败和生产模式强制调度。
+19. 固件 minimum-offset 窗口、样本不足/过期/不确定、Host epoch 重获、过早/过晚 deadline 和新 session 取消 pending frame。
+20. 10/20/40 groups 的 3.2 MHz 四位编码长度分别为 520/640/880 bytes，含前后 500 us 低电平 guard 的完整 wire time 分别为 1300/1600/2200 us，并从相同 latch deadline 得到不同发送起点。
+21. scheduled sequence-1 KEY 必须先全节点编码，再以同一 apply/media 和每节点相同 raw 发送三轮、轮间 2 ms；固件覆盖幂等去重、generation 0 非 KEY 门禁、KEY preparation 后会话准入、输出失败后由下一张完整帧恢复、安全超时每轮检查和 scheduled SPI 不重试。
 
 ### 12.3 端到端软件验收
 
@@ -563,8 +639,10 @@ last_success_time
 
 - 约 300～301 个逻辑帧。
 - 每帧一个 `zone_32` 模拟节点命令。
-- 每个数字物理节点每帧一个完整多输出数据报，并只刷新一次。
+- 每个数字物理节点每帧一个完整数据报，并只刷新一次；Phase 31 生产数据报恰好包含一个 output 1 / GPIO4 描述符。
 - 同帧 Sequence 完全一致。
+- 同帧生产数据报共享一个非零 scheduled `apply_at_us`，clock beacon 与 apply deadline 来自同一个 Host monotonic clock。
+- session-start 同帧在任何节点发送前完成全节点编码，随后三轮保持相同节点 raw、apply 和 media identity；重复 KEY 不得产生额外逻辑帧或 session generation。
 - 无 NaN/Inf。
 - 无协议解码失败。
 - 队列无旧帧积压。
@@ -584,8 +662,19 @@ last_success_time
 
 ```text
 pio run -d firmware/stm32_rgbcct_node
-pio run -d firmware/esp32_ws2811_node
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File firmware/esp32_ws2811_node/scripts/run_native_tests_msvc.ps1
+1..13 | ForEach-Object { pio run -j 2 -d firmware/esp32_ws2811_node -e "esp32-s3-node-$_"; if ($LASTEXITCODE -ne 0) { throw "ESP32 Node $_ build failed with exit code $LASTEXITCODE" } }
 ```
+
+Windows 使用仓库内的 MSVC wrapper；已提供 `gcc` 和 `g++` 的主机可改用
+`pio test -d firmware/esp32_ws2811_node -e native` 执行同一组测试。
+
+执行 ESP32 命令前，必须确认 `pio` 位于 A 盘，并按固件 README 将
+`PLATFORMIO_CORE_DIR`、`PLATFORMIO_PLATFORMS_DIR`、
+`PLATFORMIO_PACKAGES_DIR`、`PLATFORMIO_CACHE_DIR`、`TEMP`、`TMP` 和
+`TMPDIR` 全部设为 `firmware/esp32_ws2811_node/.pio` 下的项目本地路径。
+13 个生产环境必须按 Node 顺序低并发串行构建，不能并行放大内存和 Windows 分页
+压力；项目缓存、构建临时文件和测试临时文件均不得重新写入 C 盘。
 
 报告必须包含：
 
@@ -605,7 +694,7 @@ pio run -d firmware/esp32_ws2811_node
 
 - 安卓平板 App。
 - 最终舱体施工和商业配电设计。
-- 确定最终接线、IP 地址、电源分段和真实同步性能；这些均保持可配置并标记 `NOT HARDWARE VERIFIED`。
+- 最终施工、电源分段和真实同步性能；Phase 31 已定义映射和现场地址合同，但在真实记录完成前仍标记 `NOT HARDWARE VERIFIED`。
 - 自动选择电源和线径。
 - RK3588 与 RK3568 分布式计算。
 - NPU/GPU优化。

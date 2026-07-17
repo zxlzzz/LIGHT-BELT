@@ -1,0 +1,15 @@
+# Generic emergency black sentinel. The selected profile determines which
+# exact compiled node receives the KEY black and exit SAFE frame.
+# NOT HARDWARE VERIFIED.
+schema_version: 2
+
+show:
+  id: "ws2811-emergency-black-sentinel-3s"
+  duration: 3.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: "replace"
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+  cues: []

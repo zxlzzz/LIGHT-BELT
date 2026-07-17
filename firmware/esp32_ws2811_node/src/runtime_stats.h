@@ -36,7 +36,15 @@ struct RuntimeStats {
   std::atomic<uint32_t> display_sequence_gaps{0};
   std::atomic<uint32_t> refresh_attempts{0};
   std::atomic<uint32_t> refresh_ok{0};
+  std::atomic<uint32_t> identical_skipped{0};
+  std::atomic<uint32_t> physical_offset_waits{0};
+  std::atomic<uint32_t> physical_offset_cancelled{0};
+  std::atomic<uint32_t> emergency_payload_rejected{0};
   std::atomic<uint32_t> spi_transactions_ok{0};
+  std::atomic<uint32_t> encoded_hash_checks{0};
+  std::atomic<uint32_t> encoded_hash_mismatches{0};
+  std::atomic<uint32_t> uniform_frame_checks{0};
+  std::atomic<uint32_t> uniform_frame_mismatches{0};
   std::atomic<uint32_t> output_errors{0};
   std::atomic<uint32_t> invariant_errors{0};
   std::atomic<uint32_t> rollback_ok{0};
