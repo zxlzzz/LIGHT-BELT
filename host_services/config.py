@@ -3,6 +3,8 @@
 本地测试时不需要改任何值；部署 RK3588 时按注释调整。
 """
 
+import os
+
 # ── 网络 ──
 HOST = "0.0.0.0"
 PORT = 8443
@@ -30,8 +32,10 @@ ENABLE_TLS = False
 TLS_CERTFILE = "/etc/light-belt/cert.pem"
 TLS_KEYFILE = "/etc/light-belt/key.pem"
 
-# ── mpv IPC（生产环境用） ──
-MPV_SOCKET_PATH = "/tmp/mpv.sock"
+# ── mpv IPC（生产环境用；可用环境变量覆盖，本地调试可设 /tmp/mpv.sock） ──
+MPV_SOCKET_PATH = os.environ.get("MPV_SOCKET_PATH", "/run/light-belt/mpv.sock")
+# mpv 视频输出的 DISPLAY；仅当进程环境未设置 DISPLAY 时生效
+MPV_DISPLAY = os.environ.get("MPV_DISPLAY", ":0")
 
 # ── 版本信息 ──
 SERVICE_NAME = "light-belt-host"

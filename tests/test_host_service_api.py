@@ -26,6 +26,7 @@ def reset_engine_state(monkeypatch):
         }
     ])
     monkeypatch.setattr(engine_adapter, "_scenes", {})
+    monkeypatch.setattr(engine_adapter, "_save_scenes", lambda: None)
     monkeypatch.setitem(engine_adapter._state, "playback_state", "idle")
     monkeypatch.setitem(engine_adapter._state, "show_id", None)
     monkeypatch.setitem(engine_adapter._state, "position_ms", 0)

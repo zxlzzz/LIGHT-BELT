@@ -122,7 +122,7 @@ _devices = [
      "connection_confirmed": True, "error_code": None},
 ]
 
-_scenes: dict[str, dict] = {}
+_scenes: dict[str, dict] = {}  # 启动时由下方 _scenes.update(_load_scenes()) 从 SCENE_FILE_PATH 恢复
 
 
 def _now_ms() -> int:
@@ -258,19 +258,32 @@ def _playback_data() -> dict:
     }
 
 
+def _wait_until(cond, timeout_s: float = 3.0, interval_s: float = 0.05) -> bool:
+    """轮询直到 cond() 为真或超时。返回是否成功。"""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if cond():
+            return True
+        time.sleep(interval_s)
+    return cond()
+
+
 def _ensure_mpv() -> MpvClient:
     global _mpv, _mpv_proc
-    from .config import MPV_SOCKET_PATH
+    from .config import MPV_SOCKET_PATH, MPV_DISPLAY
     sock = MPV_SOCKET_PATH
     if not os.path.exists(sock):
         os.makedirs(os.path.dirname(sock), exist_ok=True)
+        env = os.environ.copy()
+        env.setdefault("DISPLAY", MPV_DISPLAY)
         _mpv_proc = subprocess.Popen(
             ["mpv", f"--input-ipc-server={sock}", "--idle=yes",
              "--no-terminal"],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            env={**os.environ,"DISPLAY":":0"}
+            env=env,
         )
-        time.sleep(1)
+        if not _wait_until(lambda: os.path.exists(sock)):
+            _log.warning("mpv IPC socket %s not ready after timeout", sock)
     if _mpv is None:
         _mpv = MpvClient(sock)
     return _mpv
@@ -285,7 +298,9 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
     mpv = _ensure_mpv()
     mpv.play_file(show["media_path"])
     if start_ms and start_ms > 0:
-        time.sleep(0.5)
+        # 等文件真正加载（duration 可读）再 seek，替代固定 sleep
+        if not _wait_until(lambda: mpv.get_duration() > 0, timeout_s=2.0):
+            _log.warning("mpv did not report duration in time; seeking anyway")
         mpv.seek(start_ms / 1000)
     _state["playback_state"] = "playing"
     _state["show_id"] = show_id
@@ -420,6 +435,37 @@ def audio_set(volume: float | None, muted: bool | None,
 # Scenes (V1.1)
 # ══════════════════════════════════════════════
 
+def _load_scenes() -> dict[str, dict]:
+    try:
+        with open(SCENE_FILE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+        _log.warning("scene file %s has unexpected format; ignoring", SCENE_FILE_PATH)
+    except FileNotFoundError:
+        pass
+    except Exception as exc:
+        _log.warning("failed to load scenes from %s: %s", SCENE_FILE_PATH, exc)
+    return {}
+
+
+def _save_scenes() -> None:
+    try:
+        d = os.path.dirname(SCENE_FILE_PATH)
+        if d:
+            os.makedirs(d, exist_ok=True)
+        tmp = SCENE_FILE_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_scenes, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, SCENE_FILE_PATH)
+    except Exception as exc:
+        _log.warning("failed to persist scenes to %s: %s", SCENE_FILE_PATH, exc)
+
+
+# 服务启动时从磁盘恢复场景（文件不存在则保持空）
+_scenes.update(_load_scenes())
+
+
 def get_scenes() -> list[dict]:
     return [
         {"scene_id": sid, "name": s["name"],
@@ -449,6 +495,7 @@ def scene_save(scene_id: str | None, name: str,
         "created_ms": _scenes.get(scene_id, {}).get("created_ms", now),
         "updated_ms": now,
     }
+    _save_scenes()
     return {"scene_id": scene_id, "saved": True}, None
 
 
@@ -487,6 +534,7 @@ def scene_delete(scene_id: str) -> tuple[dict | None, str | None]:
     del _scenes[scene_id]
     if _state["scene_id"] == scene_id:
         _state["scene_id"] = None
+    _save_scenes()
     return {"scene_id": scene_id, "deleted": True}, None
 
 
