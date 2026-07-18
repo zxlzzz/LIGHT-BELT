@@ -20,11 +20,18 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "httpx>=0.27",
+]
+host = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "websockets>=12",
+    "pyjwt>=2.9",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["light_engine*"]
+include = ["light_engine*", "host_services*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

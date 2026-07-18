@@ -1,0 +1,16 @@
+[
+  {
+    "show_id": "teacher-demo-v1",
+    "name": "Teacher Demo",
+    "duration_ms": 300000,
+    "description": "Main demonstration show for classroom use",
+    "media_path": "/opt/light-belt/assets/teacher-demo.mp4"
+  },
+  {
+    "show_id": "ambient-loop",
+    "name": "Ambient Loop",
+    "duration_ms": 600000,
+    "description": "Background ambient lighting loop",
+    "media_path": "/opt/light-belt/assets/ambient-loop.mp4"
+  }
+]
