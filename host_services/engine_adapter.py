@@ -99,16 +99,46 @@ _state = {
     "scene_id": None,
 }
 
+_SHOW_REQUIRED_FIELDS = ("show_id", "name", "duration_ms", "media_path")
+# 对 APP 隐藏的内部字段（媒体与灯效文件路径）
+_SHOW_INTERNAL_FIELDS = {"media_path", "show_yaml"}
+
+
 def _load_shows_manifest() -> list[dict]:
+    """从 SHOWS_MANIFEST_PATH 加载节目单。
+
+    格式见 host_services/shows_manifest.example.json。
+    非法条目跳过并告警，不影响其余节目。
+    """
     try:
         with open(SHOWS_MANIFEST_PATH, encoding="utf-8") as f:
-            return json.load(f)
+            raw = json.load(f)
     except FileNotFoundError:
         _log.warning("shows manifest not found at %s; starting with empty show list", SHOWS_MANIFEST_PATH)
         return []
     except Exception as exc:
         _log.warning("failed to load shows manifest: %s; starting with empty show list", exc)
         return []
+    if not isinstance(raw, list):
+        _log.warning("shows manifest must be a JSON array; got %s", type(raw).__name__)
+        return []
+    shows: list[dict] = []
+    seen: set[str] = set()
+    for i, s in enumerate(raw):
+        if not isinstance(s, dict):
+            _log.warning("manifest entry %d is not an object; skipped", i)
+            continue
+        missing = [k for k in _SHOW_REQUIRED_FIELDS if s.get(k) is None]
+        if missing:
+            _log.warning("manifest entry %d (show_id=%r) missing %s; skipped",
+                         i, s.get("show_id"), missing)
+            continue
+        if s["show_id"] in seen:
+            _log.warning("duplicate show_id %r at entry %d; skipped", s["show_id"], i)
+            continue
+        seen.add(s["show_id"])
+        shows.append({"description": None, "show_yaml": None, **s})
+    return shows
 
 
 _shows: list[dict] = _load_shows_manifest()
@@ -165,9 +195,9 @@ def get_state() -> dict:
 # ══════════════════════════════════════════════
 
 def get_shows() -> list[dict]:
-    # media_path 是内部字段，不对外暴露
+    # media_path / show_yaml 是内部字段，不对外暴露
     return [
-        {k: v for k, v in s.items() if k != "media_path"}
+        {k: v for k, v in s.items() if k not in _SHOW_INTERNAL_FIELDS}
         for s in _shows
     ]
 

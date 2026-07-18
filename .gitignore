@@ -73,3 +73,5 @@ desktop.ini
 *.flac
 *.wav
 *.mp3
+assets/*
+!assets/README.md
