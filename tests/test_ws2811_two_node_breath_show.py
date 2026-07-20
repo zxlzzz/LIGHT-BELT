@@ -6,8 +6,7 @@ from light_engine.config import Config
 from light_engine.mapping import Layout, PhysicalMapping
 from light_engine.models import EffectContext
 from light_engine.outputs.transform import OutputTransform
-from light_engine.outputs.udp_output import UdpOutputV3
-from light_engine.outputs.udp_v3 import FLAG_KEY_FRAME, FLAG_SAFE_STATE, UdpV3Packet
+from light_engine.outputs.ddp_output import DDP_HEADER_LEN, DdpOutput
 from light_engine.show import ShowRuntime, TargetCatalog, black_base_frame, load_show
 
 
@@ -16,8 +15,8 @@ SHOW = Path("config/shows/ws2811-ab-two-node-blue-breath-staged-75s.yaml")
 FPS = 15.0
 BLACK = (0, 0, 0)
 NODE_SPECS = {
-    2: (("192.168.31.202", 9001), 10),
-    8: (("192.168.31.208", 9001), 20),
+    2: (("192.168.31.58", 4048), 10),
+    8: (("192.168.31.208", 4048), 20),
 }
 
 
@@ -40,7 +39,7 @@ def test_two_node_breath_packets_are_uniform_blue_and_in_phase() -> None:
             power_limit=config.get("outputs.transform.power_limit"),
         )
         mapping = PhysicalMapping(layout)
-        output = UdpOutputV3()
+        output = DdpOutput()
         output.open()
         levels_by_node = {2: set(), 8: set()}
         last_physical_pixels = {2: None, 8: None}
@@ -69,20 +68,12 @@ def test_two_node_breath_packets_are_uniform_blue_and_in_phase() -> None:
             chunk = output.get_sent_datagrams()[-2:]
             packets = {}
             for raw, address in chunk:
-                node_id = 2 if address[0].endswith(".202") else 8
+                node_id = 2 if address[0] == "192.168.31.58" else 8
                 expected_address, pixel_count = NODE_SPECS[node_id]
                 assert address == expected_address
-                packet = UdpV3Packet.decode(
-                    raw,
-                    expected_node_id=node_id,
-                    expected_outputs={1: (4, pixel_count)},
-                )
-                assert packet is not None
-                pixels = packet.outputs[0].pixels
-                if (
-                    packet.flags & FLAG_KEY_FRAME
-                    or pixels != last_physical_pixels[node_id]
-                ):
+                payload = raw[DDP_HEADER_LEN:]
+                pixels = tuple(tuple(payload[offset:offset + 3]) for offset in range(0, len(payload), 3))
+                if pixels != last_physical_pixels[node_id]:
                     physical_writes[node_id] += 1
                     last_physical_pixels[node_id] = pixels
                 else:
@@ -110,18 +101,13 @@ def test_two_node_breath_packets_are_uniform_blue_and_in_phase() -> None:
         )
         output.send_frame(mapping.map(safe))
         for raw, address in output.get_sent_datagrams()[-2:]:
-            node_id = 2 if address[0].endswith(".202") else 8
+            node_id = 2 if address[0] == "192.168.31.58" else 8
             _, pixel_count = NODE_SPECS[node_id]
-            packet = UdpV3Packet.decode(
-                raw,
-                expected_node_id=node_id,
-                expected_outputs={1: (4, pixel_count)},
-            )
-            assert packet is not None
-            assert packet.flags & FLAG_SAFE_STATE
-            assert packet.outputs[0].pixels == (BLACK,) * pixel_count
+            payload = raw[DDP_HEADER_LEN:]
+            pixels = tuple(tuple(payload[offset:offset + 3]) for offset in range(0, len(payload), 3))
+            assert pixels == (BLACK,) * pixel_count
             physical_writes[node_id] += 1
-            last_physical_pixels[node_id] = packet.outputs[0].pixels
+            last_physical_pixels[node_id] = pixels
 
         assert len(levels_by_node[2]) == 32
         assert len(levels_by_node[8]) == 32
