@@ -91,6 +91,20 @@ def test_derive_capabilities_targets_each_has_name(layout):
         assert t["name"]  # non-empty
 
 
+def test_derive_capabilities_targets_known_chinese_names(layout):
+    targets = {t["target_id"]: t["name"] for t in derive_capabilities_targets(layout)}
+    assert targets["all"] == "全部灯带"
+    assert targets["strip_11"] == "屏幕上方"
+    assert targets["strip_22"] == "地面边缘"
+    assert targets[STARRY_SKY_TARGET_ID] == "星空灯"
+
+
+def test_derive_capabilities_targets_unknown_strip_falls_back_to_id():
+    layout = _make_layout(strip_ids=("strip_99",), node_ids=(1,))
+    targets = {t["target_id"]: t["name"] for t in derive_capabilities_targets(layout)}
+    assert targets["strip_99"] == "strip_99"
+
+
 # ── derive_device_list ────────────────────────────────────────────────────────
 
 def test_derive_device_list_node_ids(layout):

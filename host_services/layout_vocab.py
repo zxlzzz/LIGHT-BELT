@@ -11,6 +11,26 @@ from light_engine.mapping import Layout
 
 STARRY_SKY_TARGET_ID = "starry_sky"
 
+# Chinese display names for known target IDs.
+# Targets not listed here fall back to their logical ID (safe for future strips).
+TARGET_DISPLAY_NAMES: dict[str, str] = {
+    "all":        "全部灯带",
+    "strip_11":   "屏幕上方",
+    "strip_21":   "屏幕下方",
+    "strip_31":   "屏幕左侧",
+    "strip_41":   "屏幕右侧",
+    "strip_12":   "顶棚边缘",
+    "strip_22":   "地面边缘",
+    "strip_32":   "左侧舷窗",
+    "strip_43":   "右墙波浪一",
+    "strip_44":   "右墙波浪二",
+    "starry_sky": "星空灯",
+}
+
+
+def _display_name(target_id: str) -> str:
+    return TARGET_DISPLAY_NAMES.get(target_id, target_id)
+
 
 def derive_target_ids(layout: Layout) -> frozenset[str]:
     """All valid target IDs: strip logical IDs from layout + 'all' + 'starry_sky'."""
@@ -22,13 +42,14 @@ def derive_capabilities_targets(layout: Layout) -> list[dict]:
 
     'all' comes first, then each strip in layout order, then 'starry_sky'
     with its supported_effects field to distinguish it as a special device.
+    Unknown target IDs fall back to using the logical ID as the display name.
     """
-    targets: list[dict] = [{"target_id": "all", "name": "all"}]
+    targets: list[dict] = [{"target_id": "all", "name": _display_name("all")}]
     for strip in layout.strips:
-        targets.append({"target_id": strip.id, "name": strip.id})
+        targets.append({"target_id": strip.id, "name": _display_name(strip.id)})
     targets.append({
         "target_id": STARRY_SKY_TARGET_ID,
-        "name": STARRY_SKY_TARGET_ID,
+        "name": _display_name(STARRY_SKY_TARGET_ID),
         "supported_effects": ["twinkle"],
     })
     return targets
