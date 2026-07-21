@@ -408,3 +408,54 @@ def test_scene_apply_all_entry_updates_master_state(client, auth_headers):
 
     after = client.get("/api/v1/state", headers=auth_headers).json()["data"]["brightness"]
     assert after == pytest.approx(0.33)
+
+
+# ── New: color params passed through (problems 1 & 2) ────────────────────────
+
+def test_effects_set_with_color(client, auth_headers):
+    r = client.post(
+        "/api/v1/effects/set",
+        json={
+            "target_id": "all",
+            "effect_type": "static",
+            "params": {"color": {"r": 255, "g": 128, "b": 0}},
+        },
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["effect_type"] == "static"
+    assert data["params"]["color"] == {"r": 255, "g": 128, "b": 0}
+
+
+def test_lights_set_with_color(client, auth_headers):
+    r = client.post(
+        "/api/v1/lights/set",
+        json={
+            "target_id": "all",
+            "brightness": 0.8,
+            "color": {"r": 100, "g": 200, "b": 50},
+        },
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["brightness"] == pytest.approx(0.8)
+    assert data["color"] == {"r": 100, "g": 200, "b": 50}
+
+
+def test_playback_play_no_media(client, auth_headers, monkeypatch):
+    monkeypatch.setattr(engine_adapter, "_shows", [{
+        "show_id": "no-media-show",
+        "name": "No Media Show",
+        "duration_ms": 30000,
+        "description": None,
+        "media_path": None,
+    }])
+    r = client.post(
+        "/api/v1/playback/play",
+        json={"show_id": "no-media-show"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    assert r.json()["data"]["playback_state"] == "playing"

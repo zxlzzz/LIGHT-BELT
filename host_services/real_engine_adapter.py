@@ -55,10 +55,12 @@ class RealEngineAdapter:
         profile_path: str,
         mpv_socket_path: str,
         python_executable: str = "python",
+        strip_ids: frozenset[str] | set[str] | None = None,
     ) -> None:
         self._profile = profile_path
         self._mpv_socket = mpv_socket_path
         self._python = python_executable
+        self._strip_ids: frozenset[str] = frozenset(strip_ids) if strip_ids else frozenset()
 
         self._playback_proc: subprocess.Popen | None = None
         self._manual_proc: subprocess.Popen | None = None
@@ -108,6 +110,7 @@ class RealEngineAdapter:
         self._stop_aux_poll()
         _kill_proc(self._playback_proc, "playback engine")
         self._playback_proc = None
+        self.stop_manual()
 
         from . import starry_sky
         starry_sky.ensure_off()
@@ -139,10 +142,16 @@ class RealEngineAdapter:
     def _build_manual_show(self, target_states: list[dict]) -> str | None:
         """Write a schema_version 2 show YAML for infinite static cues and return path."""
         cues = []
-        for i, ts in enumerate(target_states):
+        expanded: list[dict] = []
+        for ts in target_states:
             tid = ts.get("target_id", "")
             if tid == "all":
-                continue  # 'all' has no direct v2 target type; skip
+                for sid in sorted(self._strip_ids):
+                    expanded.append({**ts, "target_id": sid})
+            else:
+                expanded.append(ts)
+        for i, ts in enumerate(expanded):
+            tid = ts.get("target_id", "")
             effect_type = ts.get("effect_type", "static")
             color = ts.get("color", [1.0, 1.0, 1.0])
             cues.append({
@@ -186,6 +195,10 @@ class RealEngineAdapter:
                 pass
         self._manual_yaml_tmp = tmp_path
         return tmp_path
+
+    def stop_manual(self) -> None:
+        """Public method to stop the manual engine subprocess."""
+        self._stop_manual()
 
     def _stop_manual(self) -> None:
         _kill_proc(self._manual_proc, "manual engine")

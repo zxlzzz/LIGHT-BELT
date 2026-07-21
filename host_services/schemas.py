@@ -46,20 +46,23 @@ class PlayRequest(BaseModel):
 class SeekRequest(BaseModel):
     position_ms: float = Field(ge=0)
 
+# ────────────────── Shared primitives ──────────────────
+
+class RGB(BaseModel):
+    r: int = Field(ge=0, le=255)
+    g: int = Field(ge=0, le=255)
+    b: int = Field(ge=0, le=255)
+
 # ────────────────── Lights ──────────────────
 
 class LightsSetRequest(BaseModel):
     target_id: str
     brightness: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     color_temperature: Optional[int] = Field(default=None, ge=2700, le=6500)
+    color: Optional[RGB] = None
     transition_ms: Optional[float] = Field(default=0, ge=0)
 
 # ────────────────── Effects ──────────────────
-
-class RGB(BaseModel):
-    r: int = Field(ge=0, le=255)
-    g: int = Field(ge=0, le=255)
-    b: int = Field(ge=0, le=255)
 
 class EffectCommonParams(BaseModel):
     color: Optional[RGB] = None

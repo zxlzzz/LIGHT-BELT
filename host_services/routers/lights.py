@@ -13,6 +13,7 @@ async def lights_set(body: LightsSetRequest, request: Request):
     data, err = engine_adapter.lights_set(
         body.target_id, body.brightness,
         body.color_temperature, body.transition_ms or 0,
+        color=body.color,
     )
     if err == "NOT_FOUND":
         return not_found(request, f"Unknown target_id: {body.target_id}")

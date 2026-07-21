@@ -13,6 +13,8 @@ async def effects_set(body: EffectsSetRequest, request: Request):
     data, err = engine_adapter.effects_set(
         body.target_id, body.effect_type,
         body.transition_ms or 0,
+        params=body.params,
+        effect_params=body.effect_params,
     )
     if err == "NOT_FOUND":
         return not_found(request, f"Unknown target_id: {body.target_id}")
