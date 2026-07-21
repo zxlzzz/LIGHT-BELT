@@ -10,12 +10,6 @@ from pydantic import BaseModel, Field
 
 VALID_CLIENT_TYPES = {"tablet", "phone", "debug"}
 
-VALID_TARGET_IDS = {
-    "all", "ceiling_left", "ceiling_right",
-    "wall_left", "wall_right", "front", "rear",
-    "screen", "screen_surround", "virtual_path.screen_to_wall",
-}
-
 VALID_EFFECT_TYPES = {
     "static", "breath", "color_wave", "chase", "comet",
     "audio_pulse", "bass_pulse", "spectrum",

@@ -41,6 +41,10 @@ tags:
     description: 灯光控制
   - name: Effects
     description: 灯效控制
+  - name: Audio
+    description: 音量与静音控制
+  - name: Scenes
+    description: 场景管理
 security:
   - bearerAuth: []
 paths:
@@ -619,6 +623,218 @@ paths:
           $ref: "#/components/responses/ErrorResponse"
         "500":
           $ref: "#/components/responses/ErrorResponse"
+  /audio:
+    get:
+      tags: [Audio]
+      summary: 获取当前音量和静音状态
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 音频状态
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioResponse"
+              example:
+                ok: true
+                request_id: req-audio-001
+                data:
+                  volume: 0.8
+                  muted: false
+                  audio_output_available: true
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /audio/set:
+    post:
+      tags: [Audio]
+      summary: 设置音量或静音状态
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AudioSetRequest"
+            example:
+              volume: 0.6
+              muted: false
+              transition_ms: 0
+      responses:
+        "200":
+          description: 命令已接受
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AudioSetResponse"
+              example:
+                ok: true
+                request_id: req-audio-set-001
+                data:
+                  volume: 0.6
+                  muted: false
+                  transition_ms: 0
+                  accepted: true
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /scenes:
+    get:
+      tags: [Scenes]
+      summary: 获取已保存场景列表
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 场景列表
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScenesResponse"
+              example:
+                ok: true
+                request_id: req-scenes-001
+                data:
+                  scenes:
+                    - scene_id: reading-mode
+                      name: 阅读模式
+                      created_ms: 1720000000000
+                      updated_ms: 1720000001000
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /scenes/save:
+    post:
+      tags: [Scenes]
+      summary: 保存或更新场景
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneSaveRequest"
+            example:
+              scene_id: reading-mode
+              name: 阅读模式
+              audio:
+                volume: 0.6
+                muted: false
+              entries:
+                - target_id: strip_11
+                  brightness: 0.8
+                  color_temperature: 4200
+                  transition_ms: 500
+      responses:
+        "200":
+          description: 场景已保存
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SceneSaveResponse"
+              example:
+                ok: true
+                request_id: req-scenes-save-001
+                data:
+                  scene_id: reading-mode
+                  saved: true
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "409":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /scenes/apply:
+    post:
+      tags: [Scenes]
+      summary: 应用已保存场景（自动停止当前节目）
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneApplyRequest"
+            example:
+              scene_id: reading-mode
+              transition_ms: 500
+      responses:
+        "200":
+          description: 场景已应用
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SceneApplyResponse"
+              example:
+                ok: true
+                request_id: req-scenes-apply-001
+                data:
+                  scene_id: reading-mode
+                  accepted: true
+                  partial: false
+                  failed_targets: []
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
+  /scenes/delete:
+    post:
+      tags: [Scenes]
+      summary: 删除已保存场景
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SceneDeleteRequest"
+            example:
+              scene_id: reading-mode
+      responses:
+        "200":
+          description: 场景已删除
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SceneDeleteResponse"
+              example:
+                ok: true
+                request_id: req-scenes-delete-001
+                data:
+                  scene_id: reading-mode
+                  deleted: true
+        "401":
+          $ref: "#/components/responses/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/ErrorResponse"
 components:
   securitySchemes:
     bearerAuth:
@@ -711,17 +927,11 @@ components:
       enum: [idle, playing, paused, stopped, error]
     TargetId:
       type: string
-      enum:
-        - all
-        - ceiling_left
-        - ceiling_right
-        - wall_left
-        - wall_right
-        - front
-        - rear
-        - screen
-        - screen_surround
-        - virtual_path.screen_to_wall
+      description: >
+        Host Service 暴露给 APP 的逻辑目标 ID。实际可用值由引擎布局在启动时
+        动态生成，通过 GET /capabilities 的 targets 数组获取。固定项包括
+        "all"（全部灯带广播）和 "starry_sky"（星空灯），其余形如
+        "strip_<label>"（单条 WS2811 灯带）。
     EffectType:
       type: string
       enum:
@@ -737,9 +947,10 @@ components:
         - video_audio_fusion
         - calm
         - demo
+        - twinkle
     DeviceType:
       type: string
-      enum: [light_zone, light_path, host_output]
+      enum: [wled_board]
     DeviceStatus:
       type: string
       enum: [online, offline, error]
@@ -900,6 +1111,9 @@ components:
         - duration_ms
         - brightness
         - color_temperature
+        - volume
+        - muted
+        - scene_id
         - audio_available
         - video_available
         - audio_link_enabled
@@ -927,6 +1141,15 @@ components:
           type: number
           minimum: 2700
           maximum: 6500
+        volume:
+          type: number
+          minimum: 0
+          maximum: 1
+        muted:
+          type: boolean
+        scene_id:
+          nullable: true
+          type: string
         audio_available:
           type: boolean
         video_available:
@@ -982,6 +1205,11 @@ components:
           $ref: "#/components/schemas/TargetId"
         name:
           type: string
+        supported_effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/EffectType"
+          description: 该目标支持的灯效类型列表（仅特殊设备如 starry_sky 携带此字段）。
     CapabilityEffect:
       type: object
       required: [effect_type, name, params, effect_params]
@@ -1343,3 +1571,200 @@ components:
               properties:
                 session_id:
                   type: string
+    AudioData:
+      type: object
+      required: [volume, muted, audio_output_available]
+      properties:
+        volume:
+          type: number
+          minimum: 0
+          maximum: 1
+        muted:
+          type: boolean
+        audio_output_available:
+          type: boolean
+    AudioResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AudioData"
+    AudioSetRequest:
+      type: object
+      properties:
+        volume:
+          type: number
+          minimum: 0
+          maximum: 1
+        muted:
+          type: boolean
+        transition_ms:
+          type: number
+          minimum: 0
+          default: 0
+    AudioSetData:
+      type: object
+      required: [volume, muted, transition_ms, accepted]
+      properties:
+        volume:
+          type: number
+          minimum: 0
+          maximum: 1
+        muted:
+          type: boolean
+        transition_ms:
+          type: number
+          minimum: 0
+        accepted:
+          type: boolean
+    AudioSetResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/AudioSetData"
+    SceneItem:
+      type: object
+      required: [scene_id, name, created_ms, updated_ms]
+      properties:
+        scene_id:
+          type: string
+        name:
+          type: string
+        created_ms:
+          type: number
+          minimum: 0
+        updated_ms:
+          type: number
+          minimum: 0
+    ScenesData:
+      type: object
+      required: [scenes]
+      properties:
+        scenes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SceneItem"
+    ScenesResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/ScenesData"
+    SceneAudio:
+      type: object
+      properties:
+        volume:
+          type: number
+          minimum: 0
+          maximum: 1
+        muted:
+          type: boolean
+    SceneEntry:
+      type: object
+      required: [target_id]
+      properties:
+        target_id:
+          $ref: "#/components/schemas/TargetId"
+        brightness:
+          type: number
+          minimum: 0
+          maximum: 1
+        color_temperature:
+          type: number
+          minimum: 2700
+          maximum: 6500
+        effect_type:
+          $ref: "#/components/schemas/EffectType"
+        transition_ms:
+          type: number
+          minimum: 0
+          default: 0
+    SceneSaveRequest:
+      type: object
+      required: [name]
+      properties:
+        scene_id:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+        name:
+          type: string
+          minLength: 1
+        audio:
+          $ref: "#/components/schemas/SceneAudio"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/SceneEntry"
+          minItems: 1
+    SceneSaveData:
+      type: object
+      required: [scene_id, saved]
+      properties:
+        scene_id:
+          type: string
+        saved:
+          type: boolean
+    SceneSaveResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SceneSaveData"
+    SceneApplyRequest:
+      type: object
+      required: [scene_id]
+      properties:
+        scene_id:
+          type: string
+          minLength: 1
+        transition_ms:
+          type: number
+          minimum: 0
+    SceneApplyData:
+      type: object
+      required: [scene_id, accepted, partial, failed_targets]
+      properties:
+        scene_id:
+          type: string
+        accepted:
+          type: boolean
+        partial:
+          type: boolean
+        failed_targets:
+          type: array
+          items:
+            type: string
+    SceneApplyResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SceneApplyData"
+    SceneDeleteRequest:
+      type: object
+      required: [scene_id]
+      properties:
+        scene_id:
+          type: string
+          minLength: 1
+    SceneDeleteData:
+      type: object
+      required: [scene_id, deleted]
+      properties:
+        scene_id:
+          type: string
+        deleted:
+          type: boolean
+    SceneDeleteResponse:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SceneDeleteData"

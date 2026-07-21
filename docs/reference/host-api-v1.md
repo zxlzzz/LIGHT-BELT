@@ -311,6 +311,8 @@ Response 字段解释：
 - `TOKEN_EXPIRED`
 - `INTERNAL_ERROR`
 
+> `/auth/register`、`/auth/login`、`/auth/logout`、`/auth/password`：预留，当前版本未实现。
+
 ### POST /api/v1/session/ws-ticket
 
 用途：申请一次 WebSocket 连接票据。
@@ -405,26 +407,20 @@ Response JSON 示例：
     "duration_ms": 300000,
     "brightness": 0.8,
     "color_temperature": 4200,
+    "volume": 0.8,
+    "muted": false,
+    "scene_id": null,
     "audio_available": true,
     "video_available": true,
     "audio_link_enabled": true,
     "video_link_enabled": true,
     "devices": [
       {
-        "device_id": "analog.ceiling_left",
-        "device_type": "light_zone",
+        "device_id": "node_1",
+        "device_type": "wled_board",
         "status": "online",
         "last_output_ms": 1720000000123,
         "last_seen_ms": 1720000000120,
-        "connection_confirmed": true,
-        "error_code": null
-      },
-      {
-        "device_id": "digital.screen_to_wall",
-        "device_type": "light_path",
-        "status": "online",
-        "last_output_ms": 1720000000123,
-        "last_seen_ms": 1720000000118,
         "connection_confirmed": true,
         "error_code": null
       }
@@ -444,6 +440,9 @@ Response 字段解释：
 | `duration_ms` | 是 | number | 当前节目总时长，单位毫秒。 |
 | `brightness` | 是 | number | 当前亮度，范围 `0.0~1.0`。 |
 | `color_temperature` | 是 | number | 当前色温，范围 `2700~6500`。 |
+| `volume` | 是 | number | 当前音量，范围 `0.0~1.0`。 |
+| `muted` | 是 | boolean | 当前是否静音。 |
+| `scene_id` | 是 | string 或 null | 最近一次应用的场景 ID；手动调光/调效或播放节目后重置为 `null`。 |
 | `audio_available` | 是 | boolean | 音频输入是否可用。 |
 | `video_available` | 是 | boolean | 视频输入是否可用。 |
 | `audio_link_enabled` | 是 | boolean | 音频联动是否启用。 |
@@ -537,11 +536,16 @@ Response JSON 示例：
     "targets": [
       {
         "target_id": "all",
-        "name": "All"
+        "name": "全部灯带"
       },
       {
-        "target_id": "screen_surround",
-        "name": "Screen Surround"
+        "target_id": "strip_11",
+        "name": "屏幕上方"
+      },
+      {
+        "target_id": "starry_sky",
+        "name": "星空灯",
+        "supported_effects": ["twinkle"]
       }
     ],
     "effects": [
@@ -1056,6 +1060,347 @@ Response 字段解释：
 - `DEVICE_OFFLINE`
 - `INTERNAL_ERROR`
 
+### GET /api/v1/audio
+
+用途：获取当前音量和静音状态。
+
+| 项目 | 值 |
+|---|---|
+| URL | `https://192.168.31.236:8443/api/v1/audio` |
+| Method | `GET` |
+| Header | `Authorization: Bearer <access_token>`, `X-Request-Id` 可选 |
+
+Request JSON 示例：无请求体。
+
+Request 字段解释：
+
+| 字段 | 必填 | 类型 | 枚举/范围 | 说明 |
+|---|---:|---|---|---|
+| 无 | 否 | - | - | GET 请求不提交 JSON body。 |
+
+Response JSON 示例：
+
+```json
+{
+  "ok": true,
+  "request_id": "req-audio-001",
+  "data": {
+    "volume": 0.8,
+    "muted": false,
+    "audio_output_available": true
+  }
+}
+```
+
+Response 字段解释：
+
+| 字段 | 必填 | 类型 | 说明 |
+|---|---:|---|---|
+| `volume` | 是 | number | 当前音量，范围 `0.0~1.0`。 |
+| `muted` | 是 | boolean | 当前是否静音。 |
+| `audio_output_available` | 是 | boolean | 音频输出是否可用。 |
+
+可能的 `error.code`：
+
+- `UNAUTHORIZED`
+- `TOKEN_EXPIRED`
+- `INTERNAL_ERROR`
+
+### POST /api/v1/audio/set
+
+用途：设置音量或静音状态。
+
+| 项目 | 值 |
+|---|---|
+| URL | `https://192.168.31.236:8443/api/v1/audio/set` |
+| Method | `POST` |
+| Header | `Content-Type: application/json`, `Authorization: Bearer <access_token>`, `X-Request-Id` 可选 |
+
+Request JSON 示例：
+
+```json
+{
+  "volume": 0.6,
+  "muted": false,
+  "transition_ms": 0
+}
+```
+
+Request 字段解释：
+
+| 字段 | 必填 | 类型 | 枚举/范围 | 说明 |
+|---|---:|---|---|---|
+| `volume` | 条件 | number | `0.0~1.0` | 目标音量。`volume` 与 `muted` 至少提交一个。 |
+| `muted` | 条件 | boolean | - | 是否静音。`volume` 与 `muted` 至少提交一个。 |
+| `transition_ms` | 否 | number | `>= 0` | 过渡时间，单位毫秒。当前版本无实际效果，等同于 0。 |
+
+Response JSON 示例：
+
+```json
+{
+  "ok": true,
+  "request_id": "req-audio-set-001",
+  "data": {
+    "volume": 0.6,
+    "muted": false,
+    "transition_ms": 0,
+    "accepted": true
+  }
+}
+```
+
+Response 字段解释：
+
+| 字段 | 必填 | 类型 | 说明 |
+|---|---:|---|---|
+| `volume` | 是 | number | 已接受的音量。 |
+| `muted` | 是 | boolean | 已接受的静音状态。 |
+| `transition_ms` | 是 | number | 已接受的过渡时间，单位毫秒。 |
+| `accepted` | 是 | boolean | 命令是否已接受。 |
+
+可能的 `error.code`：
+
+- `INVALID_ARGUMENT`（`volume` 与 `muted` 均未提交时返回）
+- `UNAUTHORIZED`
+- `TOKEN_EXPIRED`
+- `INTERNAL_ERROR`
+
+### GET /api/v1/scenes
+
+用途：获取已保存场景列表。
+
+| 项目 | 值 |
+|---|---|
+| URL | `https://192.168.31.236:8443/api/v1/scenes` |
+| Method | `GET` |
+| Header | `Authorization: Bearer <access_token>`, `X-Request-Id` 可选 |
+
+Request JSON 示例：无请求体。
+
+Request 字段解释：
+
+| 字段 | 必填 | 类型 | 枚举/范围 | 说明 |
+|---|---:|---|---|---|
+| 无 | 否 | - | - | GET 请求不提交 JSON body。 |
+
+Response JSON 示例：
+
+```json
+{
+  "ok": true,
+  "request_id": "req-scenes-001",
+  "data": {
+    "scenes": [
+      {
+        "scene_id": "reading-mode",
+        "name": "阅读模式",
+        "created_ms": 1720000000000,
+        "updated_ms": 1720000001000
+      }
+    ]
+  }
+}
+```
+
+Response 字段解释：
+
+| 字段 | 必填 | 类型 | 说明 |
+|---|---:|---|---|
+| `scenes` | 是 | object[] | 已保存场景列表（最多 32 条）。 |
+| `scenes[].scene_id` | 是 | string | 场景 ID。 |
+| `scenes[].name` | 是 | string | 场景展示名称。 |
+| `scenes[].created_ms` | 是 | number | 创建时间，Unix epoch 毫秒。 |
+| `scenes[].updated_ms` | 是 | number | 最近更新时间，Unix epoch 毫秒。 |
+
+可能的 `error.code`：
+
+- `UNAUTHORIZED`
+- `TOKEN_EXPIRED`
+- `INTERNAL_ERROR`
+
+### POST /api/v1/scenes/save
+
+用途：保存当前灯光状态为场景，或更新已有场景。
+
+| 项目 | 值 |
+|---|---|
+| URL | `https://192.168.31.236:8443/api/v1/scenes/save` |
+| Method | `POST` |
+| Header | `Content-Type: application/json`, `Authorization: Bearer <access_token>`, `X-Request-Id` 可选 |
+
+Request JSON 示例：
+
+```json
+{
+  "scene_id": "reading-mode",
+  "name": "阅读模式",
+  "audio": {
+    "volume": 0.6,
+    "muted": false
+  },
+  "entries": [
+    {
+      "target_id": "strip_11",
+      "brightness": 0.8,
+      "color_temperature": 4200,
+      "transition_ms": 500
+    }
+  ]
+}
+```
+
+Request 字段解释：
+
+| 字段 | 必填 | 类型 | 枚举/范围 | 说明 |
+|---|---:|---|---|---|
+| `scene_id` | 否 | string | `^[a-z0-9-]{1,64}$` | 场景 ID；省略时自动生成。 |
+| `name` | 是 | string | 非空 | 场景展示名称。 |
+| `audio` | 条件 | object | - | 音频设置。`audio` 与 `entries` 至少提交一个。 |
+| `audio.volume` | 否 | number | `0.0~1.0` | 场景音量。 |
+| `audio.muted` | 否 | boolean | - | 场景静音状态。 |
+| `entries` | 条件 | object[] | 至少 1 条 | 灯光目标设置列表。`audio` 与 `entries` 至少提交一个。 |
+| `entries[].target_id` | 是 | string | target_id 枚举 | 目标区域。 |
+| `entries[].brightness` | 否 | number | `0.0~1.0` | 亮度。 |
+| `entries[].color_temperature` | 否 | number | `2700~6500` | 色温。 |
+| `entries[].effect_type` | 否 | string | effect_type 枚举 | 灯效类型。 |
+| `entries[].transition_ms` | 否 | number | `>= 0` | 过渡时间，单位毫秒。 |
+
+Response JSON 示例：
+
+```json
+{
+  "ok": true,
+  "request_id": "req-scenes-save-001",
+  "data": {
+    "scene_id": "reading-mode",
+    "saved": true
+  }
+}
+```
+
+Response 字段解释：
+
+| 字段 | 必填 | 类型 | 说明 |
+|---|---:|---|---|
+| `scene_id` | 是 | string | 已保存的场景 ID。 |
+| `saved` | 是 | boolean | 是否保存成功。 |
+
+可能的 `error.code`：
+
+- `INVALID_ARGUMENT`（`name` 为空，或 `audio` 与 `entries` 均未提交时返回）
+- `CONFLICT`（已达 32 条场景上限时返回 `SCENE_LIMIT_EXCEEDED`）
+- `UNAUTHORIZED`
+- `TOKEN_EXPIRED`
+- `INTERNAL_ERROR`
+
+### POST /api/v1/scenes/apply
+
+用途：应用已保存场景。自动停止当前播放节目。
+
+| 项目 | 值 |
+|---|---|
+| URL | `https://192.168.31.236:8443/api/v1/scenes/apply` |
+| Method | `POST` |
+| Header | `Content-Type: application/json`, `Authorization: Bearer <access_token>`, `X-Request-Id` 可选 |
+
+Request JSON 示例：
+
+```json
+{
+  "scene_id": "reading-mode",
+  "transition_ms": 500
+}
+```
+
+Request 字段解释：
+
+| 字段 | 必填 | 类型 | 枚举/范围 | 说明 |
+|---|---:|---|---|---|
+| `scene_id` | 是 | string | 非空 | 要应用的场景 ID。 |
+| `transition_ms` | 否 | number | `>= 0` | 过渡时间，单位毫秒。 |
+
+Response JSON 示例：
+
+```json
+{
+  "ok": true,
+  "request_id": "req-scenes-apply-001",
+  "data": {
+    "scene_id": "reading-mode",
+    "accepted": true,
+    "partial": false,
+    "failed_targets": []
+  }
+}
+```
+
+Response 字段解释：
+
+| 字段 | 必填 | 类型 | 说明 |
+|---|---:|---|---|
+| `scene_id` | 是 | string | 已应用的场景 ID。 |
+| `accepted` | 是 | boolean | 命令是否已接受。 |
+| `partial` | 是 | boolean | 是否部分目标应用失败。 |
+| `failed_targets` | 是 | string[] | 应用失败的 `target_id` 列表。 |
+
+可能的 `error.code`：
+
+- `NOT_FOUND`（场景 ID 不存在）
+- `UNAUTHORIZED`
+- `TOKEN_EXPIRED`
+- `INTERNAL_ERROR`
+
+### POST /api/v1/scenes/delete
+
+用途：删除已保存场景。
+
+| 项目 | 值 |
+|---|---|
+| URL | `https://192.168.31.236:8443/api/v1/scenes/delete` |
+| Method | `POST` |
+| Header | `Content-Type: application/json`, `Authorization: Bearer <access_token>`, `X-Request-Id` 可选 |
+
+Request JSON 示例：
+
+```json
+{
+  "scene_id": "reading-mode"
+}
+```
+
+Request 字段解释：
+
+| 字段 | 必填 | 类型 | 枚举/范围 | 说明 |
+|---|---:|---|---|---|
+| `scene_id` | 是 | string | 非空 | 要删除的场景 ID。 |
+
+Response JSON 示例：
+
+```json
+{
+  "ok": true,
+  "request_id": "req-scenes-delete-001",
+  "data": {
+    "scene_id": "reading-mode",
+    "deleted": true
+  }
+}
+```
+
+Response 字段解释：
+
+| 字段 | 必填 | 类型 | 说明 |
+|---|---:|---|---|
+| `scene_id` | 是 | string | 已删除的场景 ID。 |
+| `deleted` | 是 | boolean | 是否删除成功。 |
+
+可能的 `error.code`：
+
+- `NOT_FOUND`（场景 ID 不存在）
+- `UNAUTHORIZED`
+- `TOKEN_EXPIRED`
+- `INTERNAL_ERROR`
+
 ## 6. WebSocket 说明
 
 连接地址：
@@ -1366,19 +1711,31 @@ data 字段解释：
 ### target_id
 
 这些值是 Host Service 暴露给 APP 的逻辑目标，不是文件路径，也不是硬件节点地址。
+**实际可用的 `target_id` 列表由引擎配置文件（`ENGINE_PROFILE_PATH`）中的布局在启动时动态生成，
+通过 `GET /capabilities` 的 `targets` 数组获取。** 固定项如下：
 
 | 值 | 说明 |
 |---|---|
-| `all` | 全部区域。 |
-| `ceiling_left` | 左侧顶部区域。 |
-| `ceiling_right` | 右侧顶部区域。 |
-| `wall_left` | 左墙区域。 |
-| `wall_right` | 右墙区域。 |
-| `front` | 前方区域。 |
-| `rear` | 后方区域。 |
-| `screen` | 屏幕区域。 |
-| `screen_surround` | 屏幕环绕区域。 |
-| `virtual_path.screen_to_wall` | 屏幕到墙面的连续路径。 |
+| `all` | 全部数字灯带（广播目标）。 |
+| `strip_<label>` | 单条数字灯带，label 为物理标签，例如 `strip_11`、`strip_22`。具体列表从布局文件派生。 |
+| `starry_sky` | 星空灯（UDP 拨动设备，192.168.31.205:3333）。独立目标，不属于数字灯带。 |
+
+`starry_sky` 支持的 `effect_type`：
+
+| `effect_type` | 说明 |
+|---|---|
+| `twinkle` | 开启星空灯（闪烁效果）。 |
+| 其他值 | 关闭星空灯。 |
+
+`starry_sky` 的 `GET /capabilities` 响应格式：
+
+```json
+{
+  "target_id": "starry_sky",
+  "name": "星空灯",
+  "supported_effects": ["twinkle"]
+}
+```
 
 ### effect_type
 
@@ -1396,14 +1753,13 @@ data 字段解释：
 | `video_audio_fusion` | 视频音频融合。 |
 | `calm` | 平静氛围。 |
 | `demo` | 演示循环。 |
+| `twinkle` | 星空灯闪烁（仅对 `starry_sky` 有效）。 |
 
 ### device_type
 
 | 值 | 说明 |
 |---|---|
-| `light_zone` | 灯光区域。 |
-| `light_path` | 连续灯光路径。 |
-| `host_output` | 主机输出。 |
+| `wled_board` | WLED ESP32 控制板（每块对应一条 WS2811 灯带）。 |
 
 ### device status
 

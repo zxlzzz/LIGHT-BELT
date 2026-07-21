@@ -1,10 +1,11 @@
 """
 Engine Adapter —— 唯一和「下层」打交道的地方。
 
-本地测试版：所有状态存在内存里，不依赖 mpv / light_engine / 硬件。
-切换到生产时，只需要把这个文件里的方法实现换成真实调用。
+Mock 模式（ENGINE_ADAPTER=mock，默认）：所有状态存在内存里，不依赖 mpv /
+light_engine / 硬件。
 
-相当于 Java 里 ServiceImpl 的 mock 版本。
+生产模式（ENGINE_ADAPTER=real）：同样的内存状态 + 真实 light_engine 子进程
+（通过 _real_adapter）。测试永远跑 mock 模式，不受影响。
 """
 
 import time
@@ -15,10 +16,46 @@ import uuid
 import socket
 import subprocess
 from typing import Any
-from .config import SCENE_MAX_COUNT, SCENE_FILE_PATH, SHOWS_MANIFEST_PATH
-from .schemas import VALID_TARGET_IDS, VALID_EFFECT_TYPES
+from .config import (
+    SCENE_MAX_COUNT, SCENE_FILE_PATH, SHOWS_MANIFEST_PATH,
+    ENGINE_PROFILE_PATH, ENGINE_ADAPTER,
+)
+from .schemas import VALID_EFFECT_TYPES
 
 _log = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════
+# Layout vocabulary (derived at import time)
+# ══════════════════════════════════════════════
+
+def _load_layout_vocab():
+    """Return (valid_target_ids, capability_targets, devices) from ENGINE_PROFILE_PATH."""
+    try:
+        from pathlib import Path as _Path
+        from light_engine.config import Config as _Config
+        from light_engine.mapping import Layout
+        from .layout_vocab import derive_target_ids, derive_capabilities_targets, derive_device_list
+        config = _Config.get_instance(_Path(ENGINE_PROFILE_PATH))
+        layout = Layout.from_config(config)
+        return (
+            derive_target_ids(layout),
+            derive_capabilities_targets(layout),
+            derive_device_list(layout),
+        )
+    except Exception as exc:
+        _log.warning(
+            "engine_adapter: failed to load layout vocab from %s: %s; using empty vocab",
+            ENGINE_PROFILE_PATH, exc,
+        )
+        return frozenset({"all"}), [{"target_id": "all", "name": "all"}], []
+
+
+_valid_target_ids: frozenset[str]
+_capability_targets: list[dict]
+_devices: list[dict]
+_valid_target_ids, _capability_targets, _devices = _load_layout_vocab()
+
 
 # ══════════════════════════════════════════════
 # mpv IPC 客户端
@@ -99,58 +136,16 @@ _state = {
     "scene_id": None,
 }
 
-_SHOW_REQUIRED_FIELDS = ("show_id", "name", "duration_ms", "media_path")
-# 对 APP 隐藏的内部字段（媒体与灯效文件路径）
-_SHOW_INTERNAL_FIELDS = {"media_path", "show_yaml"}
+# Internal fields hidden from the /shows API response.
+_SHOW_INTERNAL_FIELDS = {"media_path", "show_yaml", "aux_triggers"}
 
 
-def _load_shows_manifest() -> list[dict]:
-    """从 SHOWS_MANIFEST_PATH 加载节目单。
-
-    格式见 host_services/shows_manifest.example.json。
-    非法条目跳过并告警，不影响其余节目。
-    """
-    try:
-        with open(SHOWS_MANIFEST_PATH, encoding="utf-8") as f:
-            raw = json.load(f)
-    except FileNotFoundError:
-        _log.warning("shows manifest not found at %s; starting with empty show list", SHOWS_MANIFEST_PATH)
-        return []
-    except Exception as exc:
-        _log.warning("failed to load shows manifest: %s; starting with empty show list", exc)
-        return []
-    if not isinstance(raw, list):
-        _log.warning("shows manifest must be a JSON array; got %s", type(raw).__name__)
-        return []
-    shows: list[dict] = []
-    seen: set[str] = set()
-    for i, s in enumerate(raw):
-        if not isinstance(s, dict):
-            _log.warning("manifest entry %d is not an object; skipped", i)
-            continue
-        missing = [k for k in _SHOW_REQUIRED_FIELDS if s.get(k) is None]
-        if missing:
-            _log.warning("manifest entry %d (show_id=%r) missing %s; skipped",
-                         i, s.get("show_id"), missing)
-            continue
-        if s["show_id"] in seen:
-            _log.warning("duplicate show_id %r at entry %d; skipped", s["show_id"], i)
-            continue
-        seen.add(s["show_id"])
-        shows.append({"description": None, "show_yaml": None, **s})
-    return shows
+def _load_shows() -> list[dict]:
+    from . import shows_loader
+    return shows_loader.load_shows()
 
 
-_shows: list[dict] = _load_shows_manifest()
-
-_devices = [
-    {"device_id": "analog.ceiling_left", "device_type": "light_zone",
-     "status": "online", "last_output_ms": 0, "last_seen_ms": 0,
-     "connection_confirmed": True, "error_code": None},
-    {"device_id": "digital.screen_to_wall", "device_type": "light_path",
-     "status": "online", "last_output_ms": 0, "last_seen_ms": 0,
-     "connection_confirmed": True, "error_code": None},
-]
+_shows: list[dict] = _load_shows()
 
 _scenes: dict[str, dict] = {}  # 启动时由下方 _scenes.update(_load_scenes()) 从 SCENE_FILE_PATH 恢复
 
@@ -164,6 +159,32 @@ def _touch_devices():
     for d in _devices:
         d["last_output_ms"] = t
         d["last_seen_ms"] = t
+
+
+# ══════════════════════════════════════════════
+# Real adapter (None in mock mode)
+# ══════════════════════════════════════════════
+
+_real_adapter = None  # type: Any  # RealEngineAdapter | None
+
+
+def _init_real_adapter():
+    global _real_adapter
+    if ENGINE_ADAPTER != "real":
+        return
+    try:
+        from .real_engine_adapter import RealEngineAdapter
+        from .config import MPV_SOCKET_PATH
+        _real_adapter = RealEngineAdapter(
+            profile_path=ENGINE_PROFILE_PATH,
+            mpv_socket_path=MPV_SOCKET_PATH,
+        )
+        _log.info("engine_adapter: real adapter initialized")
+    except Exception as exc:
+        _log.error("engine_adapter: failed to init real adapter: %s", exc)
+
+
+_init_real_adapter()
 
 
 # ══════════════════════════════════════════════
@@ -195,7 +216,6 @@ def get_state() -> dict:
 # ══════════════════════════════════════════════
 
 def get_shows() -> list[dict]:
-    # media_path / show_yaml 是内部字段，不对外暴露
     return [
         {k: v for k, v in s.items() if k not in _SHOW_INTERNAL_FIELDS}
         for s in _shows
@@ -207,18 +227,6 @@ def get_shows() -> list[dict]:
 # ══════════════════════════════════════════════
 
 def get_capabilities() -> dict:
-    targets = [
-        {"target_id": "all", "name": "全部区域"},
-        {"target_id": "ceiling_left", "name": "左侧顶部"},
-        {"target_id": "ceiling_right", "name": "右侧顶部"},
-        {"target_id": "wall_left", "name": "左墙"},
-        {"target_id": "wall_right", "name": "右墙"},
-        {"target_id": "front", "name": "前方"},
-        {"target_id": "rear", "name": "后方"},
-        {"target_id": "screen", "name": "屏幕"},
-        {"target_id": "screen_surround", "name": "屏幕环绕"},
-        {"target_id": "virtual_path.screen_to_wall", "name": "屏幕到墙面路径"},
-    ]
     effects = [
         {"effect_type": "static", "name": "Static",
          "params": ["color", "intensity"], "effect_params": []},
@@ -257,7 +265,7 @@ def get_capabilities() -> dict:
         "audio": True, "scenes": True,
     }
     return {
-        "targets": targets,
+        "targets": _capability_targets,
         "effects": effects,
         "websocket": {"message_types": ws_types},
         "supports": supports,
@@ -328,7 +336,6 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
     mpv = _ensure_mpv()
     mpv.play_file(show["media_path"])
     if start_ms and start_ms > 0:
-        # 等文件真正加载（duration 可读）再 seek，替代固定 sleep
         if not _wait_until(lambda: mpv.get_duration() > 0, timeout_s=2.0):
             _log.warning("mpv did not report duration in time; seeking anyway")
         mpv.seek(start_ms / 1000)
@@ -337,6 +344,8 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
     _state["position_ms"] = start_ms or 0
     _state["duration_ms"] = show["duration_ms"]
     _state["scene_id"] = None
+    if _real_adapter is not None:
+        _real_adapter.on_playback_start(show, start_ms)
     return _playback_data(), None
 
 
@@ -363,6 +372,8 @@ def playback_stop() -> tuple[dict, None]:
     _state["show_id"] = None
     _state["position_ms"] = 0
     _state["duration_ms"] = 0
+    if _real_adapter is not None:
+        _real_adapter.on_playback_stop()
     return _playback_data(), None
 
 
@@ -381,7 +392,7 @@ def playback_seek(position_ms: float) -> tuple[dict | None, str | None]:
 def lights_set(target_id: str, brightness: float | None,
                color_temperature: int | None,
                transition_ms: float) -> tuple[dict | None, str | None]:
-    if target_id not in VALID_TARGET_IDS:
+    if target_id not in _valid_target_ids:
         return None, "NOT_FOUND"
     if brightness is None and color_temperature is None:
         return None, "INVALID_ARGUMENT"
@@ -400,6 +411,13 @@ def lights_set(target_id: str, brightness: float | None,
         data["brightness"] = brightness
     if color_temperature is not None:
         data["color_temperature"] = color_temperature
+    if _real_adapter is not None:
+        color = [brightness if brightness is not None else 1.0] * 3
+        _real_adapter.on_manual_command([{
+            "target_id": target_id,
+            "effect_type": "static",
+            "color": color,
+        }])
     return data, None
 
 
@@ -409,11 +427,32 @@ def lights_set(target_id: str, brightness: float | None,
 
 def effects_set(target_id: str, effect_type: str,
                 transition_ms: float) -> tuple[dict | None, str | None]:
-    if target_id not in VALID_TARGET_IDS:
+    from .layout_vocab import STARRY_SKY_TARGET_ID
+    if target_id not in _valid_target_ids:
         return None, "NOT_FOUND"
+    # twinkle is the only valid effect for starry_sky; "off" is also accepted
+    if target_id == STARRY_SKY_TARGET_ID:
+        from . import starry_sky as _ss
+        if effect_type == "twinkle":
+            _ss.ensure_on()
+        else:
+            _ss.ensure_off()
+        _state["scene_id"] = None
+        return {
+            "target_id": target_id,
+            "effect_type": effect_type,
+            "transition_ms": transition_ms,
+            "accepted": True,
+        }, None
     if effect_type not in VALID_EFFECT_TYPES:
         return None, "INVALID_ARGUMENT"
     _state["scene_id"] = None
+    if _real_adapter is not None:
+        _real_adapter.on_manual_command([{
+            "target_id": target_id,
+            "effect_type": effect_type,
+            "color": [1.0, 1.0, 1.0],
+        }])
     return {
         "target_id": target_id,
         "effect_type": effect_type,
@@ -511,7 +550,7 @@ def scene_save(scene_id: str | None, name: str,
         return None, "INVALID_ARGUMENT"
     if entries:
         for i, e in enumerate(entries):
-            if e.get("target_id") not in VALID_TARGET_IDS:
+            if e.get("target_id") not in _valid_target_ids:
                 return {"error_detail": {"entry_index": i, "field": "target_id"}}, "INVALID_ARGUMENT"
             if e.get("effect_type") and e["effect_type"] not in VALID_EFFECT_TYPES:
                 return {"error_detail": {"entry_index": i, "field": "effect_type"}}, "INVALID_ARGUMENT"

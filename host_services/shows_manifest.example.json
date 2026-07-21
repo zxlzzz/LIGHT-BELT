@@ -1,18 +1,15 @@
-[
-  {
-    "show_id": "cabin-demo",
-    "name": "客舱灯光演示",
-    "description": "音视频 + 灯效联动的完整演示节目",
-    "duration_ms": 60000,
-    "media_path": "assets/cabin-demo.mp4",
-    "show_yaml": "config/shows/cabin-show-v2.yaml"
-  },
-  {
-    "show_id": "audio-only-sample",
-    "name": "纯音频示例",
-    "description": "无灯效，仅 mpv 播放",
-    "duration_ms": 30000,
-    "media_path": "assets/audio-only-sample.wav",
-    "show_yaml": null
+{
+  "_comment": "Optional overlay for auto-discovered shows in assets/. Keys are show_id (folder name). Fields here override or supplement what shows_loader discovers automatically. aux_triggers is hidden from the API.",
+  "phase-17-full-show-wled-five-board": {
+    "show_id": "phase-17-full-show-wled-five-board",
+    "name": "Phase 17 Full Show",
+    "description": "Full cabin lighting show with starry-sky trigger at 3m50s",
+    "aux_triggers": [
+      {
+        "target": "starry_sky",
+        "at_ms": 230000,
+        "action": "on"
+      }
+    ]
   }
-]
+}

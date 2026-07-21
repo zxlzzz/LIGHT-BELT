@@ -27,6 +27,16 @@ SCENE_FILE_PATH = "data/scenes.json"    # 运行时数据，不进 git
 # ── 节目单 ──
 SHOWS_MANIFEST_PATH = "data/shows_manifest.json"  # 运行时数据，不进 git
 
+# ── 引擎 ──
+import pathlib as _pl
+_DEFAULT_PROFILE = str(
+    _pl.Path(__file__).resolve().parent.parent
+    / "config" / "profiles" / "rk3588-host-service.yaml"
+)
+ENGINE_PROFILE_PATH: str = os.environ.get("ENGINE_PROFILE_PATH", _DEFAULT_PROFILE)
+# "mock" (default, in-memory) or "real" (subprocess light_engine)
+ENGINE_ADAPTER: str = os.environ.get("ENGINE_ADAPTER", "mock")
+
 # ── TLS（生产部署用，本地默认关闭） ──
 ENABLE_TLS = False
 TLS_CERTFILE = "/etc/light-belt/cert.pem"

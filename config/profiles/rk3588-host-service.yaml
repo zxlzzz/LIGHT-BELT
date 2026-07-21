@@ -1,0 +1,193 @@
+# Host Service production profile for RK3588.
+# Layout identical to wled-five-board-phase-17.yaml.
+# Clock: mpv (media-driven timing via JSON IPC).
+# max_brightness capped at 0.65 for field safety.
+outputs:
+  mode: production
+  enabled:
+  - ddp
+  exit_safe_state: true
+  ddp:
+    enabled: true
+    port: 4048
+  udp_v3:
+    enabled: false
+    protocol_version: 3
+    presentation:
+      mode: immediate
+  rs485_v2:
+    enabled: false
+system:
+  platform: linux_arm64
+  output_fps: 30.0
+  clock:
+    mode: mpv
+  smoothing:
+    max_brightness: 0.65
+    gamma: 1.3
+layout:
+  topology_version: 3
+  digital_output_policy: multi_output_diagnostic
+  total_strips: 9
+  zones:
+  - id: zone_32_placeholder
+    type: rgbcct
+    label: disabled_analog_placeholder
+    video_zone: left
+    direction: forward
+  analog_nodes:
+  - node_id: 17
+    zone_id: zone_32_placeholder
+    video_zone: left
+    channel_order: RGBWC
+    fade_ms: 0
+  strips:
+  - id: strip_32
+    type: digital
+    pixel_count: 20
+    video_zone: left
+    direction: forward
+  - id: strip_31
+    type: digital
+    pixel_count: 10
+    video_zone: left
+    direction: forward
+  - id: strip_41
+    type: digital
+    pixel_count: 10
+    video_zone: right
+    direction: forward
+  - id: strip_43
+    type: digital
+    pixel_count: 20
+    video_zone: right
+    direction: forward
+  - id: strip_44
+    type: digital
+    pixel_count: 20
+    video_zone: right
+    direction: forward
+  - id: strip_11
+    type: digital
+    pixel_count: 10
+    video_zone: top
+    direction: forward
+  - id: strip_12
+    type: digital
+    pixel_count: 40
+    video_zone: top
+    direction: forward
+  - id: strip_21
+    type: digital
+    pixel_count: 10
+    video_zone: bottom
+    direction: forward
+  - id: strip_22
+    type: digital
+    pixel_count: 40
+    video_zone: bottom
+    direction: forward
+  digital_nodes:
+  - node_id: 1
+    host: 192.168.31.58
+    port: 4048
+    pixel_count: 20
+    max_udp_payload: 1400
+    protocol_version: 3
+  - node_id: 2
+    host: 192.168.31.126
+    port: 4048
+    pixel_count: 20
+    max_udp_payload: 1400
+    protocol_version: 3
+  - node_id: 3
+    host: 192.168.31.25
+    port: 4048
+    pixel_count: 40
+    max_udp_payload: 1400
+    protocol_version: 3
+  - node_id: 4
+    host: 192.168.31.26
+    port: 4048
+    pixel_count: 50
+    max_udp_payload: 1400
+    protocol_version: 3
+  - node_id: 5
+    host: 192.168.31.213
+    port: 4048
+    pixel_count: 50
+    max_udp_payload: 1400
+    protocol_version: 3
+  digital_segments: []
+  digital_outputs:
+  - node_id: 1
+    output_id: 1
+    gpio: 16
+    strip_id: strip_32
+    pixel_count: 20
+    direction: forward
+  - node_id: 2
+    output_id: 1
+    gpio: 16
+    strip_id: strip_41
+    pixel_count: 10
+    direction: forward
+  - node_id: 2
+    output_id: 2
+    gpio: 2
+    strip_id: strip_31
+    pixel_count: 10
+    direction: forward
+  - node_id: 3
+    output_id: 1
+    gpio: 16
+    strip_id: strip_44
+    pixel_count: 20
+    direction: forward
+  - node_id: 3
+    output_id: 2
+    gpio: 2
+    strip_id: strip_43
+    pixel_count: 20
+    direction: forward
+  - node_id: 4
+    output_id: 1
+    gpio: 16
+    strip_id: strip_12
+    pixel_count: 40
+    direction: forward
+  - node_id: 4
+    output_id: 2
+    gpio: 2
+    strip_id: strip_11
+    pixel_count: 10
+    direction: forward
+  - node_id: 5
+    output_id: 1
+    gpio: 16
+    strip_id: strip_22
+    pixel_count: 40
+    direction: forward
+  - node_id: 5
+    output_id: 2
+    gpio: 2
+    strip_id: strip_21
+    pixel_count: 10
+    direction: forward
+  virtual_paths: []
+  video_zone_map:
+    left:
+    - zone_32_placeholder
+    - strip_32
+    - strip_31
+    right:
+    - strip_41
+    - strip_43
+    - strip_44
+    top:
+    - strip_11
+    - strip_12
+    bottom:
+    - strip_21
+    - strip_22
+    center: []

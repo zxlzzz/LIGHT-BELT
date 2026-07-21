@@ -349,7 +349,7 @@ def test_lights_set_non_all_does_not_change_master_state(client, auth_headers):
     # set brightness on a specific (non-all) target
     r = client.post(
         "/api/v1/lights/set",
-        json={"target_id": "ceiling_left", "brightness": 0.1},
+        json={"target_id": "strip_11", "brightness": 0.1},
         headers=auth_headers,
     )
     assert r.status_code == 200
@@ -379,7 +379,7 @@ def test_scene_apply_non_all_entry_does_not_change_master_state(client, auth_hea
         "/api/v1/scenes/save",
         json={
             "name": "Zone scene",
-            "entries": [{"target_id": "ceiling_left", "brightness": 0.05}],
+            "entries": [{"target_id": "strip_11", "brightness": 0.05}],
         },
         headers=auth_headers,
     )
