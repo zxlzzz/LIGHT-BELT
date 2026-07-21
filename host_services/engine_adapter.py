@@ -167,6 +167,10 @@ def _touch_devices():
 
 _real_adapter = None  # type: Any  # RealEngineAdapter | None
 
+# Accumulated manual-target state for real-adapter calls.
+# key = target_id (strip), value = {target_id, effect_type, color}.
+_manual_targets: dict[str, dict] = {}
+
 
 def _init_real_adapter():
     global _real_adapter
@@ -187,6 +191,23 @@ def _init_real_adapter():
 
 
 _init_real_adapter()
+
+
+def _accumulate_hw_entry(tid: str, effect_type: str, hw_color: list) -> None:
+    """Merge one hw entry into _manual_targets, expanding 'all' to per-strip IDs."""
+    strip_ids = _valid_target_ids - {"all", "starry_sky"}
+    entry = {"target_id": tid, "effect_type": effect_type, "color": hw_color}
+    if tid == "all":
+        for sid in strip_ids:
+            _manual_targets[sid] = {**entry, "target_id": sid}
+    else:
+        _manual_targets[tid] = entry
+
+
+def _apply_manual_targets() -> None:
+    """Send the complete accumulated _manual_targets list to the real adapter."""
+    if _real_adapter is not None and _manual_targets:
+        _real_adapter.on_manual_command(list(_manual_targets.values()))
 
 
 # ══════════════════════════════════════════════
@@ -320,6 +341,31 @@ def _ensure_mpv() -> MpvClient:
     global _mpv, _mpv_proc
     from .config import MPV_SOCKET_PATH, MPV_DISPLAY
     sock = MPV_SOCKET_PATH
+
+    if os.path.exists(sock):
+        # Probe whether mpv is actually alive behind the socket.
+        try:
+            probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            probe.settimeout(1.0)
+            probe.connect(sock)
+            probe.close()
+        except (ConnectionRefusedError, FileNotFoundError, OSError):
+            _log.warning("mpv socket %s is stale; removing and restarting mpv", sock)
+            try:
+                os.unlink(sock)
+            except FileNotFoundError:
+                pass
+            if _mpv_proc is not None and _mpv_proc.poll() is None:
+                _mpv_proc.terminate()
+                try:
+                    _mpv_proc.wait(3)
+                except subprocess.TimeoutExpired:
+                    _mpv_proc.kill()
+                    _mpv_proc.wait()
+            _mpv_proc = None
+            _mpv = None
+        # Probe succeeded — mpv is alive; skip restart.
+
     if not os.path.exists(sock):
         os.makedirs(os.path.dirname(sock), exist_ok=True)
         env = os.environ.copy()
@@ -333,6 +379,7 @@ def _ensure_mpv() -> MpvClient:
         _drain_stderr(_mpv_proc, "mpv")
         if not _wait_until(lambda: os.path.exists(sock)):
             _log.warning("mpv IPC socket %s not ready after timeout", sock)
+
     if _mpv is None:
         _mpv = MpvClient(sock)
     return _mpv
@@ -356,6 +403,7 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
     _state["position_ms"] = start_ms or 0
     _state["duration_ms"] = show["duration_ms"]
     _state["scene_id"] = None
+    _manual_targets.clear()
     if _real_adapter is not None:
         _real_adapter.on_playback_start(show, start_ms)
     return _playback_data(), None
@@ -384,9 +432,9 @@ def playback_stop() -> tuple[dict, None]:
     _state["show_id"] = None
     _state["position_ms"] = 0
     _state["duration_ms"] = 0
+    _manual_targets.clear()
     if _real_adapter is not None:
         _real_adapter.on_playback_stop()
-        _real_adapter.stop_manual()
     return _playback_data(), None
 
 
@@ -408,7 +456,7 @@ def lights_set(target_id: str, brightness: float | None,
                color=None) -> tuple[dict | None, str | None]:
     if target_id not in _valid_target_ids:
         return None, "NOT_FOUND"
-    if brightness is None and color_temperature is None:
+    if brightness is None and color_temperature is None and color is None:
         return None, "INVALID_ARGUMENT"
     if target_id == "all":
         if brightness is not None:
@@ -432,11 +480,8 @@ def lights_set(target_id: str, brightness: float | None,
             hw_color = [color.r / 255, color.g / 255, color.b / 255]
         else:
             hw_color = [brightness if brightness is not None else 1.0] * 3
-        _real_adapter.on_manual_command([{
-            "target_id": target_id,
-            "effect_type": "static",
-            "color": hw_color,
-        }])
+        _accumulate_hw_entry(target_id, "static", hw_color)
+        _apply_manual_targets()
     return data, None
 
 
@@ -482,11 +527,8 @@ def effects_set(target_id: str, effect_type: str,
             hw_color = [params.color.r / 255, params.color.g / 255, params.color.b / 255]
         else:
             hw_color = [1.0, 1.0, 1.0]
-        _real_adapter.on_manual_command([{
-            "target_id": target_id,
-            "effect_type": effect_type,
-            "color": hw_color,
-        }])
+        _accumulate_hw_entry(target_id, effect_type, hw_color)
+        _apply_manual_targets()
     return data, None
 
 
@@ -618,21 +660,26 @@ def scene_apply(scene_id: str,
                     _mpv.set_mute(a["muted"])
             except Exception as exc:
                 _log.warning("scene_apply: mpv IPC failed: %s", exc)
-    tmil = transition_ms or 0
     if scene.get("entries"):
+        _manual_targets.clear()
         for e in scene["entries"]:
             tid = e.get("target_id")
             if not tid:
                 continue
             if tid == "all":
-                if "brightness" in e and e["brightness"] is not None:
+                if e.get("brightness") is not None:
                     _state["brightness"] = e["brightness"]
-                if "color_temperature" in e and e["color_temperature"] is not None:
+                if e.get("color_temperature") is not None:
                     _state["color_temperature"] = e["color_temperature"]
-            if e.get("effect_type"):
-                effects_set(tid, e["effect_type"], tmil)
-            elif e.get("brightness") is not None or e.get("color_temperature") is not None:
-                lights_set(tid, e.get("brightness"), e.get("color_temperature"), tmil)
+            color_raw = (e.get("params") or {}).get("color")
+            if color_raw is not None:
+                hw_color = [color_raw["r"] / 255, color_raw["g"] / 255, color_raw["b"] / 255]
+            else:
+                brightness = e.get("brightness")
+                hw_color = [brightness if brightness is not None else 1.0] * 3
+            effect_type = e.get("effect_type", "static")
+            _accumulate_hw_entry(tid, effect_type, hw_color)
+        _apply_manual_targets()
     _state["scene_id"] = scene_id
     return {
         "scene_id": scene_id,

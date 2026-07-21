@@ -27,6 +27,7 @@ def reset_engine_state(monkeypatch):
     ])
     monkeypatch.setattr(engine_adapter, "_scenes", {})
     monkeypatch.setattr(engine_adapter, "_save_scenes", lambda: None)
+    monkeypatch.setattr(engine_adapter, "_manual_targets", {})
     monkeypatch.setitem(engine_adapter._state, "playback_state", "idle")
     monkeypatch.setitem(engine_adapter._state, "show_id", None)
     monkeypatch.setitem(engine_adapter._state, "position_ms", 0)
@@ -408,6 +409,65 @@ def test_scene_apply_all_entry_updates_master_state(client, auth_headers):
 
     after = client.get("/api/v1/state", headers=auth_headers).json()["data"]["brightness"]
     assert after == pytest.approx(0.33)
+
+
+# ── Round-2 fixes ─────────────────────────────────────────────────────────────
+
+def test_lights_set_color_only(client, auth_headers):
+    """lights/set with only color (no brightness/CT) must return 200."""
+    r = client.post(
+        "/api/v1/lights/set",
+        json={"target_id": "all", "color": {"r": 255, "g": 0, "b": 128}},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["color"] == {"r": 255, "g": 0, "b": 128}
+
+
+def test_playback_play_clears_scene_id(client, auth_headers, monkeypatch):
+    """Starting playback must clear scene_id in state."""
+    monkeypatch.setitem(engine_adapter._state, "scene_id", "some-scene")
+    mock_mpv = MagicMock()
+    monkeypatch.setattr(engine_adapter, "_ensure_mpv", lambda: mock_mpv)
+
+    r = client.post("/api/v1/playback/play", json={"show_id": "test-show"}, headers=auth_headers)
+    assert r.status_code == 200
+    assert engine_adapter._state["scene_id"] is None
+
+
+def test_ensure_mpv_stale_socket(monkeypatch):
+    """_ensure_mpv must detect a stale socket, remove it, and restart mpv."""
+    exists_calls = []
+
+    def mock_exists(p):
+        # First call: socket appears to exist (stale).
+        # Subsequent calls: socket is gone (after unlink) → triggers mpv start.
+        exists_calls.append(p)
+        return len(exists_calls) == 1
+
+    unlinked = []
+    mock_probe = MagicMock()
+    mock_probe.connect.side_effect = ConnectionRefusedError("stale")
+
+    mock_proc = MagicMock()
+    mock_proc.stderr = iter([])
+    mock_popen = MagicMock(return_value=mock_proc)
+
+    monkeypatch.setattr(engine_adapter, "_mpv", None)
+    monkeypatch.setattr(engine_adapter, "_mpv_proc", None)
+    monkeypatch.setattr(engine_adapter.os.path, "exists", mock_exists)
+    monkeypatch.setattr(engine_adapter.os, "makedirs", MagicMock())
+    monkeypatch.setattr(engine_adapter.os, "unlink", lambda p: unlinked.append(p))
+    monkeypatch.setattr(engine_adapter.socket, "socket", MagicMock(return_value=mock_probe))
+    monkeypatch.setattr(engine_adapter.subprocess, "Popen", mock_popen)
+    monkeypatch.setattr(engine_adapter, "_wait_until", lambda *a, **kw: True)
+
+    result = engine_adapter._ensure_mpv()
+
+    assert result is not None
+    assert len(unlinked) == 1           # stale socket was removed
+    assert mock_popen.called            # mpv was relaunched
 
 
 # ── New: color params passed through (problems 1 & 2) ────────────────────────

@@ -142,15 +142,7 @@ class RealEngineAdapter:
     def _build_manual_show(self, target_states: list[dict]) -> str | None:
         """Write a schema_version 2 show YAML for infinite static cues and return path."""
         cues = []
-        expanded: list[dict] = []
-        for ts in target_states:
-            tid = ts.get("target_id", "")
-            if tid == "all":
-                for sid in sorted(self._strip_ids):
-                    expanded.append({**ts, "target_id": sid})
-            else:
-                expanded.append(ts)
-        for i, ts in enumerate(expanded):
+        for i, ts in enumerate(target_states):
             tid = ts.get("target_id", "")
             effect_type = ts.get("effect_type", "static")
             color = ts.get("color", [1.0, 1.0, 1.0])
