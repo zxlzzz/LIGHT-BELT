@@ -158,11 +158,10 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
-def _touch_devices():
+def _mark_devices_output() -> None:
     t = _now_ms()
     for d in _devices:
         d["last_output_ms"] = t
-        d["last_seen_ms"] = t
 
 
 # ══════════════════════════════════════════════
@@ -212,6 +211,8 @@ def _apply_manual_targets() -> None:
     """Send the complete accumulated _manual_targets list to the real adapter."""
     if _real_adapter is not None and _manual_targets:
         _real_adapter.on_manual_command(list(_manual_targets.values()))
+    if _manual_targets:
+        _mark_devices_output()
 
 
 # ══════════════════════════════════════════════
@@ -234,7 +235,6 @@ def get_status() -> dict:
 # ══════════════════════════════════════════════
 
 def get_state() -> dict:
-    _touch_devices()
     return {**_state, "devices": _devices}
 
 
@@ -429,6 +429,7 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
     _manual_targets.clear()
     if _real_adapter is not None:
         _real_adapter.on_playback_start(show, start_ms)
+        _mark_devices_output()
     return _playback_data(), None
 
 
@@ -505,6 +506,8 @@ def lights_set(target_id: str, brightness: float | None,
             hw_color = [brightness if brightness is not None else 1.0] * 3
         _accumulate_hw_entry(target_id, "static", hw_color)
         _apply_manual_targets()
+    else:
+        _mark_devices_output()
     return data, None
 
 

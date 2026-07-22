@@ -15,12 +15,47 @@ import logging
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .config import HOST, PORT, ENABLE_TLS, TLS_CERTFILE, TLS_KEYFILE
 
 _log = logging.getLogger(__name__)
 
 app = FastAPI(title="LIGHT-BELT Host Service", version="1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    from .response import error as _error
+
+    def _safe(obj):
+        if isinstance(obj, bytes):
+            return obj.decode("utf-8", errors="replace")
+        if isinstance(obj, dict):
+            return {k: _safe(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_safe(x) for x in obj]
+        return obj
+
+    details = _safe(exc.errors())
+    first = details[0] if details else {}
+    field = ".".join(str(loc) for loc in first.get("loc", []))
+    msg = first.get("msg", "Validation error")
+    return _error(
+        request,
+        code="INVALID_ARGUMENT",
+        message=f"{field}: {msg}" if field else msg,
+        status_code=400,
+        details={"validation_errors": details},
+    )
 
 
 @app.exception_handler(Exception)
@@ -29,7 +64,7 @@ async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSON
     from .response import error as _error
     return _error(
         request,
-        code="INTERNAL",
+        code="INTERNAL_ERROR",
         message=f"{type(exc).__name__}: {exc}",
         status_code=500,
     )

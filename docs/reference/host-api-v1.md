@@ -601,7 +601,7 @@ Response 字段解释：
 | 字段 | 必填 | 类型 | 说明 |
 |---|---:|---|---|
 | `targets` | 是 | object[] | APP 可见逻辑目标列表。 |
-| `targets[].target_id` | 是 | string | APP 调用时使用的目标 ID。 |
+| `targets[].target_id` | 是 | string | APP 调用时使用的目标 ID。`target_id` 为动态词表，具体值由本接口的 `targets` 字段返回；当前部署参考值：`all`、`strip_11`、`strip_12`、`strip_21`、`strip_22`、`strip_31`、`strip_32`、`strip_41`、`strip_43`、`strip_44`、`starry_sky`。 |
 | `targets[].name` | 是 | string | APP 展示名称。 |
 | `effects` | 是 | object[] | 可用灯效列表。 |
 | `effects[].effect_type` | 是 | string | APP 调用时使用的灯效类型。 |
@@ -1795,4 +1795,6 @@ data 字段解释：
 | `DEVICE_OFFLINE` | 目标设备离线。 | 在设备页提示离线，并等待 `device.status` 更新。 |
 | `SHOW_NOT_LOADED` | 当前没有已加载节目。 | 先调用 `/playback/play` 指定 `show_id`。 |
 | `PLAYBACK_NOT_READY` | 播放控制暂不可执行。 | 读取 `/state`，在状态变为 `ready` 或 `running` 后重试。 |
+| `MPV_UNAVAILABLE` | mpv 播放器不可用（进程启动失败或 socket 目录不存在）。 | 检查设备上 mpv 是否已安装及 `/run/light-belt` 目录是否存在（systemd `RuntimeDirectory=light-belt`）。 |
+| `SCENE_LIMIT_EXCEEDED` | 已达场景上限（32 条）。 | 先删除不需要的场景，再重试保存。 |
 | `INTERNAL_ERROR` | 服务端内部错误。 | 记录 `request_id` 和错误信息，稍后重试。 |

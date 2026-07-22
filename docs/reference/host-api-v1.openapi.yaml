@@ -915,6 +915,8 @@ components:
         - DEVICE_OFFLINE
         - SHOW_NOT_LOADED
         - PLAYBACK_NOT_READY
+        - MPV_UNAVAILABLE
+        - SCENE_LIMIT_EXCEEDED
         - INTERNAL_ERROR
     ClientType:
       type: string
@@ -931,7 +933,20 @@ components:
         Host Service 暴露给 APP 的逻辑目标 ID。实际可用值由引擎布局在启动时
         动态生成，通过 GET /capabilities 的 targets 数组获取。固定项包括
         "all"（全部灯带广播）和 "starry_sky"（星空灯），其余形如
-        "strip_<label>"（单条 WS2811 灯带）。
+        "strip_<label>"（单条 WS2811 灯带）。以下枚举为当前部署参考值，
+        不限制未来可扩展的动态值。
+      enum:
+        - all
+        - strip_11
+        - strip_12
+        - strip_21
+        - strip_22
+        - strip_31
+        - strip_32
+        - strip_41
+        - strip_43
+        - strip_44
+        - starry_sky
     EffectType:
       type: string
       enum:

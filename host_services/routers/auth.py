@@ -32,5 +32,6 @@ async def ws_ticket(body: WsTicketRequest, request: Request):
     for t in body.subscribe:
         if t not in VALID_WS_TYPES:
             return invalid_argument(request, f"Unknown message type: {t}")
-    data = auth_manager.create_ws_ticket(body.subscribe)
+    host = request.headers.get("host", "0.0.0.0:8443")
+    data = auth_manager.create_ws_ticket(body.subscribe, host=host)
     return ok(request, data)

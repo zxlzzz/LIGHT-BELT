@@ -33,6 +33,14 @@ _SHOW_WITH_YAML = {
     "show_yaml": "/fake/show.yaml",
 }
 
+_SHOW_WITH_AUDIO = {
+    "show_id": "test-show-audio",
+    "name": "Audio Show",
+    "duration_ms": 60000,
+    "media_path": "/fake/track.mp3",
+    "show_yaml": "/fake/show.yaml",
+}
+
 _SHOW_NO_YAML = {
     "show_id": "test-show-no-yaml",
     "name": "No YAML",
@@ -42,11 +50,18 @@ _SHOW_NO_YAML = {
 }
 
 
+def _make_mock_proc():
+    m = MagicMock()
+    m.poll.return_value = None
+    m.stderr = iter([])
+    return m
+
+
 # ── on_playback_start ─────────────────────────────────────────────────────────
 
 def test_playback_start_launches_subprocess(adapter):
-    with patch("host_services.real_engine_adapter.subprocess.Popen") as mock_popen:
-        mock_popen.return_value = MagicMock()
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()) as mock_popen:
         adapter.on_playback_start(_SHOW_WITH_YAML, None)
 
     cmd = mock_popen.call_args[0][0]
@@ -58,20 +73,45 @@ def test_playback_start_launches_subprocess(adapter):
     assert "mpv" in cmd
 
 
-def test_playback_start_with_media_adds_audio_flag(adapter):
-    with patch("host_services.real_engine_adapter.subprocess.Popen") as mock_popen:
-        mock_popen.return_value = MagicMock()
-        adapter.on_playback_start(_SHOW_WITH_YAML, None)
+def test_playback_start_with_audio_file_adds_audio_flag(adapter):
+    """mp3 media → --audio flag must be present in the command."""
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()) as mock_popen:
+        adapter.on_playback_start(_SHOW_WITH_AUDIO, None)
 
     cmd = mock_popen.call_args[0][0]
     assert "--audio" in cmd
-    assert "/fake/show.mp4" in cmd
+    assert "/fake/track.mp3" in cmd
 
 
 def test_playback_start_no_yaml_skips_subprocess(adapter):
     with patch("host_services.real_engine_adapter.subprocess.Popen") as mock_popen:
         adapter.on_playback_start(_SHOW_NO_YAML, None)
     mock_popen.assert_not_called()
+
+
+# ── Fix 2: video files must not receive --audio flag ─────────────────────────
+
+def test_playback_start_video_file_no_audio_flag(adapter):
+    """mp4 video file must NOT add --audio to the command."""
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()) as mock_popen:
+        adapter.on_playback_start(_SHOW_WITH_YAML, None)
+
+    cmd = mock_popen.call_args[0][0]
+    assert "--audio" not in cmd
+
+
+def test_playback_start_wav_case_insensitive(adapter):
+    """WAV (uppercase) is an audio suffix — --audio must be added."""
+    show = {**_SHOW_WITH_YAML, "media_path": "/fake/track.WAV"}
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()) as mock_popen:
+        adapter.on_playback_start(show, None)
+
+    cmd = mock_popen.call_args[0][0]
+    assert "--audio" in cmd
+    assert "/fake/track.WAV" in cmd
 
 
 # ── on_playback_stop ──────────────────────────────────────────────────────────

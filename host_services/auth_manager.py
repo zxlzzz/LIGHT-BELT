@@ -96,7 +96,7 @@ def issue_token_pair(client_id: str) -> dict:
 
 # ────────── WS Ticket ──────────
 
-def create_ws_ticket(subscribe: list[str]) -> dict:
+def create_ws_ticket(subscribe: list[str], host: str = "0.0.0.0:8443") -> dict:
     ticket = f"wst_{uuid.uuid4().hex[:16]}"
     session_id = f"sess_{uuid.uuid4().hex[:8]}"
     _ws_tickets[ticket] = {
@@ -108,7 +108,7 @@ def create_ws_ticket(subscribe: list[str]) -> dict:
         "ws_ticket": ticket,
         "session_id": session_id,
         "expires_in": WS_TICKET_EXPIRE_SECONDS,
-        "ws_url": f"ws://0.0.0.0:8443/ws?ticket={ticket}",
+        "ws_url": f"ws://{host}/ws?ticket={ticket}",
     }
 
 

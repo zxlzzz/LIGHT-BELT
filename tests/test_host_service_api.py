@@ -542,7 +542,7 @@ def test_global_exception_handler_returns_structured_error(monkeypatch):
     assert r.status_code == 500
     body = r.json()
     assert body["ok"] is False
-    assert body["error"]["code"] == "INTERNAL"
+    assert body["error"]["code"] == "INTERNAL_ERROR"
     assert "RuntimeError" in body["error"]["message"]
     assert "request_id" in body
 
@@ -565,3 +565,106 @@ def test_playback_play_mpv_unavailable_returns_503(client, auth_headers, monkeyp
     body = r.json()
     assert body["ok"] is False
     assert body["error"]["code"] == "MPV_UNAVAILABLE"
+
+
+# ── Fix 1: Pydantic 422 → project envelope 400 ───────────────────────────────
+
+def test_validation_error_missing_field_returns_envelope(client):
+    """Missing required field must return ok=false INVALID_ARGUMENT at 400, not 422."""
+    r = client.post("/api/v1/auth/pair", json={"pairing_code": "123456"})
+    assert r.status_code == 400
+    body = r.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+    assert "validation_errors" in body["error"].get("details", {})
+
+
+def test_validation_error_wrong_type_returns_envelope(client, auth_headers):
+    """Wrong field type (brightness='abc') must return INVALID_ARGUMENT envelope at 400."""
+    r = client.post(
+        "/api/v1/lights/set",
+        json={"target_id": "all", "brightness": "abc"},
+        headers=auth_headers,
+    )
+    assert r.status_code == 400
+    body = r.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_validation_error_no_content_type_returns_envelope(client, auth_headers):
+    """POST with body but no Content-Type must return INVALID_ARGUMENT envelope at 400."""
+    r = client.post(
+        "/api/v1/lights/set",
+        content=b'{"target_id": "all", "brightness": 0.5}',
+        headers={**auth_headers, "Content-Type": "text/plain"},
+    )
+    assert r.status_code == 400
+    body = r.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "INVALID_ARGUMENT"
+
+
+# ── Fix 3: ws_url uses request Host header ────────────────────────────────────
+
+def test_ws_ticket_url_uses_request_host(client, auth_headers):
+    """ws_url must use the Host header from the request, not hardcoded 0.0.0.0."""
+    r = client.post(
+        "/api/v1/session/ws-ticket",
+        json={"subscribe": ["heartbeat"]},
+        headers={**auth_headers, "host": "cabin.local:8443"},
+    )
+    assert r.status_code == 200
+    ws_url = r.json()["data"]["ws_url"]
+    assert "cabin.local" in ws_url
+    assert "0.0.0.0" not in ws_url
+
+
+# ── Fix 4: devices last_output_ms is 0 on start, updated after lights/set ────
+
+def test_devices_last_output_ms_zero_on_start(client, auth_headers, monkeypatch):
+    """Before any command, last_output_ms and last_seen_ms must be 0."""
+    fake_device = {
+        "device_id": "node_1", "device_type": "wled_board",
+        "status": "online",
+        "last_output_ms": 0, "last_seen_ms": 0,
+        "connection_confirmed": True, "error_code": None,
+    }
+    monkeypatch.setattr(engine_adapter, "_devices", [fake_device])
+
+    r = client.get("/api/v1/state", headers=auth_headers)
+    assert r.status_code == 200
+    devices = r.json()["data"]["devices"]
+    assert len(devices) == 1
+    assert devices[0]["last_output_ms"] == 0
+    assert devices[0]["last_seen_ms"] == 0
+
+
+def test_devices_last_output_ms_updated_after_lights_set(client, auth_headers, monkeypatch):
+    """After lights/set, last_output_ms must be non-zero."""
+    fake_device = {
+        "device_id": "node_1", "device_type": "wled_board",
+        "status": "online",
+        "last_output_ms": 0, "last_seen_ms": 0,
+        "connection_confirmed": True, "error_code": None,
+    }
+    monkeypatch.setattr(engine_adapter, "_devices", [fake_device])
+
+    client.post(
+        "/api/v1/lights/set",
+        json={"target_id": "all", "brightness": 0.5},
+        headers=auth_headers,
+    )
+
+    r = client.get("/api/v1/state", headers=auth_headers)
+    devices = r.json()["data"]["devices"]
+    assert devices[0]["last_output_ms"] > 0
+
+
+# ── Fix 5: CORS middleware ────────────────────────────────────────────────────
+
+def test_cors_header_present(client):
+    """Requests with Origin header must get Access-Control-Allow-Origin in response."""
+    r = client.get("/api/v1/status", headers={"Origin": "http://cabin.local"})
+    assert r.status_code == 200
+    assert "access-control-allow-origin" in {k.lower() for k in r.headers}
