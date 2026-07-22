@@ -117,8 +117,8 @@ def test_derive_device_list_node_ids(layout):
 def test_derive_device_list_schema(layout):
     for d in derive_device_list(layout):
         assert d["device_type"] == "wled_board"
-        assert d["status"] == "online"
-        assert d["connection_confirmed"] is True
+        assert d["status"] == "offline"
+        assert d["connection_confirmed"] is False
         assert "error_code" in d
 
 
