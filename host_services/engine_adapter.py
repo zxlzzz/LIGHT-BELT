@@ -154,6 +154,24 @@ _scenes: dict[str, dict] = {}  # 启动时由下方 _scenes.update(_load_scenes(
 def _now_ms() -> int:
     return int(time.time() * 1000)
 
+import urllib.request
+
+def _probe_devices() -> None:
+    """Ping each WLED node's HTTP API; update status in-place."""
+    t = _now_ms()
+    for d in _devices:
+        host = d.get("host")
+        if not host:
+            continue
+        try:
+            urllib.request.urlopen(f"http://{host}/json/info", timeout=1)
+            d["status"] = "online"
+            d["connection_confirmed"] = True
+            d["last_seen_ms"] = t
+            d["error_code"] = None
+        except Exception:
+            d["status"] = "offline"
+            d["connection_confirmed"] = False
 
 def _mark_devices_output() -> None:
     t = _now_ms()
@@ -255,7 +273,12 @@ def get_status() -> dict:
 # ══════════════════════════════════════════════
 
 def get_state() -> dict:
-    return {**_state, "devices": _devices}
+    _probe_devices()
+    safe_devices = [
+        {k: v for k, v in d.items() if k != "host"}
+        for d in _devices
+    ]
+    return {**_state, "devices": safe_devices}
 
 
 # ══════════════════════════════════════════════

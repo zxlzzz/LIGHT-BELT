@@ -54,18 +54,13 @@ def derive_capabilities_targets(layout: Layout) -> list[dict]:
     })
     return targets
 
-
 def derive_device_list(layout: Layout) -> list[dict]:
-    """Static device entries derived from layout digital_nodes.
-
-    Each WLED board becomes a device with id='node_N'.  Status is set
-    to 'online' statically; real probing is deferred to a future phase.
-    """
     devices = []
     for node in layout.digital_nodes:
         devices.append({
             "device_id": f"node_{node.node_id}",
             "device_type": "wled_board",
+            "host": node.host,            # ← 新增
             "status": "offline",
             "last_output_ms": 0,
             "last_seen_ms": 0,
