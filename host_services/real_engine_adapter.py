@@ -90,7 +90,8 @@ class RealEngineAdapter:
             "--clock", "mpv",
             "--mpv-socket", self._mpv_socket,
         ]
-        if media_path:
+        _AUDIO_ONLY = {".mp3", ".wav", ".flac", ".ogg", ".aac"}
+        if media_path and any(media_path.lower().endswith(ext) for ext in _AUDIO_ONLY):
             cmd += ["--audio", media_path]
 
         _log.info("real adapter: starting playback engine: %s", " ".join(cmd))
