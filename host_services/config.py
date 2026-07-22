@@ -47,6 +47,9 @@ MPV_SOCKET_PATH = os.environ.get("MPV_SOCKET_PATH", "/run/light-belt/mpv.sock")
 # mpv 视频输出的 DISPLAY；仅当进程环境未设置 DISPLAY 时生效
 MPV_DISPLAY = os.environ.get("MPV_DISPLAY", ":0")
 
+# 是否启用 xrandr 视频输出检测（mock 模式默认关闭以免测试环境报错）
+VIDEO_DETECT_ENABLED: bool = ENGINE_ADAPTER == "real"
+
 # ── 版本信息 ──
 SERVICE_NAME = "light-belt-host"
 HOST_ID = "rk3588-main"

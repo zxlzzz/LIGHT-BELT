@@ -18,7 +18,7 @@ import subprocess
 from typing import Any
 from .config import (
     SCENE_MAX_COUNT, SCENE_FILE_PATH, SHOWS_MANIFEST_PATH,
-    ENGINE_PROFILE_PATH, ENGINE_ADAPTER,
+    ENGINE_PROFILE_PATH, ENGINE_ADAPTER, VIDEO_DETECT_ENABLED,
 )
 from .schemas import VALID_EFFECT_TYPES
 
@@ -194,6 +194,29 @@ def _init_real_adapter():
 
 
 _init_real_adapter()
+
+
+def _detect_video_available() -> bool:
+    """Check HDMI connection via xrandr. Returns True if any HDMI output is connected."""
+    if not VIDEO_DETECT_ENABLED:
+        return True
+    try:
+        result = subprocess.run(
+            ["xrandr", "--query"],
+            capture_output=True, text=True, timeout=5,
+            env={**os.environ, "DISPLAY": os.environ.get("DISPLAY", ":0")},
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                if "HDMI" in line and " connected" in line:
+                    return True
+            return False
+    except Exception as exc:
+        _log.warning("video detection failed: %s; assuming available", exc)
+    return True
+
+
+_state["video_available"] = _detect_video_available()
 
 
 def _accumulate_hw_entry(tid: str, effect_type: str, hw_color: list) -> None:
@@ -442,7 +465,7 @@ def playback_pause() -> tuple[dict | None, str | None]:
 
 
 def playback_resume() -> tuple[dict | None, str | None]:
-    if _state["playback_state"] != "paused":
+    if _state["playback_state"] not in ("playing", "paused"):
         return None, "PLAYBACK_NOT_READY"
     _ensure_mpv().resume()
     _state["playback_state"] = "playing"

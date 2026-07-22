@@ -667,3 +667,90 @@ def test_cors_header_present(client):
     r = client.get("/api/v1/status", headers={"Origin": "http://cabin.local"})
     assert r.status_code == 200
     assert "access-control-allow-origin" in {k.lower() for k in r.headers}
+
+
+# ── Fix 9: device initial status is offline / connection_confirmed False ──────
+
+def test_state_devices_initial_status_offline(client, auth_headers, monkeypatch):
+    """derive_device_list() must initialise status='offline' and connection_confirmed=False."""
+    from host_services.layout_vocab import derive_device_list
+    from types import SimpleNamespace
+    layout = SimpleNamespace(digital_nodes=[SimpleNamespace(node_id=1)])
+    devices = derive_device_list(layout)
+    assert devices[0]["status"] == "offline"
+    assert devices[0]["connection_confirmed"] is False
+
+
+# ── Fix 10: video_available True in mock mode ─────────────────────────────────
+
+def test_video_available_true_in_mock_mode(client, auth_headers):
+    """In mock mode (VIDEO_DETECT_ENABLED=False), video_available must be True."""
+    r = client.get("/api/v1/state", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["data"]["video_available"] is True
+
+
+def test_detect_video_available_xrandr_connected(monkeypatch):
+    """_detect_video_available returns True when xrandr reports an HDMI output connected."""
+    import subprocess as _sp
+    from host_services import engine_adapter as ea
+    fake_result = _sp.CompletedProcess(
+        args=[], returncode=0,
+        stdout="HDMI-1 connected 1920x1080+0+0\n",
+        stderr="",
+    )
+    monkeypatch.setattr(ea, "VIDEO_DETECT_ENABLED", True)
+    with __import__("unittest.mock", fromlist=["patch"]).patch(
+        "host_services.engine_adapter.subprocess.run", return_value=fake_result
+    ):
+        assert ea._detect_video_available() is True
+
+
+def test_detect_video_available_xrandr_disconnected(monkeypatch):
+    """_detect_video_available returns False when xrandr reports no HDMI connected."""
+    import subprocess as _sp
+    from host_services import engine_adapter as ea
+    fake_result = _sp.CompletedProcess(
+        args=[], returncode=0,
+        stdout="HDMI-1 disconnected\nDP-1 disconnected\n",
+        stderr="",
+    )
+    monkeypatch.setattr(ea, "VIDEO_DETECT_ENABLED", True)
+    with __import__("unittest.mock", fromlist=["patch"]).patch(
+        "host_services.engine_adapter.subprocess.run", return_value=fake_result
+    ):
+        assert ea._detect_video_available() is False
+
+
+def test_detect_video_available_xrandr_exception_returns_true(monkeypatch):
+    """If xrandr raises, _detect_video_available returns True (conservative fallback)."""
+    from host_services import engine_adapter as ea
+    monkeypatch.setattr(ea, "VIDEO_DETECT_ENABLED", True)
+    with __import__("unittest.mock", fromlist=["patch"]).patch(
+        "host_services.engine_adapter.subprocess.run", side_effect=FileNotFoundError("xrandr not found")
+    ):
+        assert ea._detect_video_available() is True
+
+
+# ── Fix 11: playback_resume allowed from 'playing' state ─────────────────────
+
+def test_playback_resume_from_playing_succeeds(client, auth_headers, monkeypatch):
+    """When playback_state is 'playing', resume must succeed (not return PLAYBACK_NOT_READY)."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "playing")
+    monkeypatch.setitem(engine_adapter._state, "show_id", "test-show")
+    monkeypatch.setitem(engine_adapter._state, "duration_ms", 60000)
+    mock_mpv = MagicMock()
+    monkeypatch.setattr(engine_adapter, "_ensure_mpv", lambda: mock_mpv)
+    r = client.post("/api/v1/playback/resume", headers=auth_headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["data"]["playback_state"] == "playing"
+
+
+def test_playback_resume_from_idle_returns_not_ready(client, auth_headers, monkeypatch):
+    """When playback_state is 'idle', resume must still return PLAYBACK_NOT_READY."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "idle")
+    r = client.post("/api/v1/playback/resume", headers=auth_headers)
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "PLAYBACK_NOT_READY"

@@ -66,10 +66,10 @@ def derive_device_list(layout: Layout) -> list[dict]:
         devices.append({
             "device_id": f"node_{node.node_id}",
             "device_type": "wled_board",
-            "status": "online",
+            "status": "offline",
             "last_output_ms": 0,
             "last_seen_ms": 0,
-            "connection_confirmed": True,
+            "connection_confirmed": False,
             "error_code": None,
         })
     return devices
