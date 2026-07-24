@@ -788,6 +788,30 @@ def test_playback_reset_when_stopped_returns_409(client, auth_headers, monkeypat
     assert r.json()["error"]["code"] == "PLAYBACK_NOT_READY"
 
 
+def test_playback_reset_from_paused_resumes_playback(client, auth_headers, monkeypatch):
+    """reset while paused must transition playback_state to 'playing'."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "paused")
+    monkeypatch.setitem(engine_adapter._state, "show_id", "test-show")
+    mock_mpv = MagicMock()
+    monkeypatch.setattr(engine_adapter, "_mpv", mock_mpv)
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["data"]["playback_state"] == "playing"
+    mock_mpv.resume.assert_called_once()
+
+
+def test_playback_reset_from_playing_does_not_call_resume(client, auth_headers, monkeypatch):
+    """reset while already playing must NOT call mpv.resume."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "playing")
+    mock_mpv = MagicMock()
+    monkeypatch.setattr(engine_adapter, "_mpv", mock_mpv)
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 200
+    mock_mpv.resume.assert_not_called()
+
+
 def test_playback_reset_clears_manual_state(client, auth_headers, monkeypatch):
     """After reset, _manual_targets must be empty."""
     monkeypatch.setitem(engine_adapter._state, "playback_state", "playing")
