@@ -539,6 +539,10 @@ def playback_reset() -> tuple[dict | None, str | None]:
         ok = _real_adapter.on_playback_resume_yaml()
         if not ok:
             return None, "NO_ACTIVE_SHOW"
+    if _state["playback_state"] == "paused":
+        if _mpv is not None:
+            _mpv.resume()
+        _state["playback_state"] = "playing"
     return _playback_data(), None
 
 
