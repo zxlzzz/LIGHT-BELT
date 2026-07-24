@@ -216,3 +216,65 @@ def test_duration_zero_when_ffprobe_fails(tmp_path):
 def test_missing_assets_dir_returns_empty(tmp_path):
     shows = load_shows(assets_dir=tmp_path / "nonexistent")
     assert shows == []
+
+
+# ── dual-media (Feature 2) ────────────────────────────────────────────────────
+
+def test_dual_media_video_and_audio(tmp_path):
+    """Folder with mp4 + mp3: media_path is video, audio_path is audio."""
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    d = assets / "dual"
+    d.mkdir()
+    (d / "video.mp4").write_text("fake")
+    (d / "audio.mp3").write_text("fake")
+
+    shows = load_shows(assets_dir=assets)
+    assert len(shows) == 1
+    s = shows[0]
+    assert s["media_path"] is not None and "video.mp4" in s["media_path"]
+    assert s["audio_path"] is not None and "audio.mp3" in s["audio_path"]
+
+
+def test_video_only_no_audio_path(tmp_path):
+    """Folder with only mp4: media_path is video, audio_path is None."""
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    d = assets / "video-only"
+    d.mkdir()
+    (d / "video.mp4").write_text("fake")
+
+    shows = load_shows(assets_dir=assets)
+    assert len(shows) == 1
+    assert "video.mp4" in shows[0]["media_path"]
+    assert shows[0]["audio_path"] is None
+
+
+def test_audio_only_no_audio_path(tmp_path):
+    """Folder with only mp3: media_path is the audio file, audio_path is None."""
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    d = assets / "audio-only"
+    d.mkdir()
+    (d / "track.mp3").write_text("fake")
+
+    shows = load_shows(assets_dir=assets)
+    assert len(shows) == 1
+    assert "track.mp3" in shows[0]["media_path"]
+    assert shows[0]["audio_path"] is None
+
+
+def test_dual_media_duration_uses_video(tmp_path):
+    """When both video and audio are present, duration_ms comes from the video file."""
+    assets = tmp_path / "assets"
+    assets.mkdir()
+    d = assets / "dual"
+    d.mkdir()
+    (d / "video.mp4").write_text("fake")
+    (d / "audio.mp3").write_text("fake")
+
+    with patch("host_services.shows_loader._probe_duration_ms") as mock_probe:
+        mock_probe.side_effect = lambda path: 120000 if path.endswith(".mp4") else 90000
+        shows = load_shows(assets_dir=assets)
+
+    assert shows[0]["duration_ms"] == 120000

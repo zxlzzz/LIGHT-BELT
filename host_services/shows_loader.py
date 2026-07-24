@@ -22,7 +22,8 @@ from pathlib import Path
 
 _log = logging.getLogger(__name__)
 
-_MEDIA_SUFFIXES = {".mp4", ".mkv", ".mov", ".mp3", ".wav", ".flac"}
+_VIDEO_SUFFIXES = {".mp4", ".mkv", ".mov"}
+_AUDIO_SUFFIXES = {".mp3", ".wav", ".flac"}
 _YAML_SUFFIXES = {".yaml", ".yml"}
 
 _HERE = Path(__file__).resolve().parent.parent  # repo root
@@ -71,25 +72,42 @@ def _discover_assets(assets_dir: Path) -> dict[str, dict]:
             continue
         show_id = entry.name
 
-        media_files = sorted(
-            p for p in entry.iterdir() if p.suffix.lower() in _MEDIA_SUFFIXES
+        video_files = sorted(
+            p for p in entry.iterdir() if p.suffix.lower() in _VIDEO_SUFFIXES
+        )
+        audio_files = sorted(
+            p for p in entry.iterdir() if p.suffix.lower() in _AUDIO_SUFFIXES
         )
         yaml_files = sorted(
             p for p in entry.iterdir() if p.suffix.lower() in _YAML_SUFFIXES
         )
 
-        if not media_files and not yaml_files:
+        if not video_files and not audio_files and not yaml_files:
             _log.warning("shows_loader: %s has no media or yaml; skipped", show_id)
             continue
 
         media_path: str | None = None
-        if media_files:
-            if len(media_files) > 1:
-                _log.warning(
-                    "shows_loader: %s has multiple media files; using %s",
-                    show_id, media_files[0].name,
-                )
-            media_path = str(media_files[0])
+        audio_path: str | None = None
+
+        if video_files and audio_files:
+            media_path = str(video_files[0])
+            audio_path = str(audio_files[0])
+            if len(video_files) > 1:
+                _log.warning("shows_loader: %s has multiple video files; using %s",
+                             show_id, video_files[0].name)
+            if len(audio_files) > 1:
+                _log.warning("shows_loader: %s has multiple audio files; using %s",
+                             show_id, audio_files[0].name)
+        elif video_files:
+            media_path = str(video_files[0])
+            if len(video_files) > 1:
+                _log.warning("shows_loader: %s has multiple video files; using %s",
+                             show_id, video_files[0].name)
+        elif audio_files:
+            media_path = str(audio_files[0])
+            if len(audio_files) > 1:
+                _log.warning("shows_loader: %s has multiple audio files; using %s",
+                             show_id, audio_files[0].name)
 
         show_yaml: str | None = None
         if yaml_files:
@@ -100,7 +118,12 @@ def _discover_assets(assets_dir: Path) -> dict[str, dict]:
                 )
             show_yaml = str(yaml_files[0])
 
-        duration_ms = _probe_duration_ms(media_path) if media_path else 0
+        if video_files:
+            duration_ms = _probe_duration_ms(str(video_files[0]))
+        elif audio_files:
+            duration_ms = _probe_duration_ms(str(audio_files[0]))
+        else:
+            duration_ms = 0
 
         shows[show_id] = {
             "show_id": show_id,
@@ -108,6 +131,7 @@ def _discover_assets(assets_dir: Path) -> dict[str, dict]:
             "description": None,
             "duration_ms": duration_ms,
             "media_path": media_path,
+            "audio_path": audio_path,
             "show_yaml": show_yaml,
         }
 
@@ -169,7 +193,7 @@ def load_shows(
         else:
             # Overlay-only entry (legacy or explicit-only show).
             entry = {"show_id": show_id, "name": show_id, "description": None,
-                     "duration_ms": 0, "media_path": None, "show_yaml": None}
+                     "duration_ms": 0, "media_path": None, "audio_path": None, "show_yaml": None}
             entry.update(ovr)
             discovered[show_id] = entry
 

@@ -676,7 +676,7 @@ def test_state_devices_initial_status_offline(client, auth_headers, monkeypatch)
     """derive_device_list() must initialise status='offline' and connection_confirmed=False."""
     from host_services.layout_vocab import derive_device_list
     from types import SimpleNamespace
-    layout = SimpleNamespace(digital_nodes=[SimpleNamespace(node_id=1)])
+    layout = SimpleNamespace(digital_nodes=[SimpleNamespace(node_id=1, host=None)])
     devices = derive_device_list(layout)
     assert devices[0]["status"] == "offline"
     assert devices[0]["connection_confirmed"] is False
@@ -755,3 +755,70 @@ def test_playback_resume_from_idle_returns_not_ready(client, auth_headers, monke
     r = client.post("/api/v1/playback/resume", headers=auth_headers)
     assert r.status_code == 409
     assert r.json()["error"]["code"] == "PLAYBACK_NOT_READY"
+
+
+# ── /playback/reset ───────────────────────────────────────────────────────────
+
+def test_playback_reset_returns_playback_data(client, auth_headers, monkeypatch):
+    """Calling reset while playing must return 200 with playback data."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "playing")
+    monkeypatch.setitem(engine_adapter._state, "show_id", "test-show")
+    monkeypatch.setitem(engine_adapter._state, "duration_ms", 60000)
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["playback_state"] == "playing"
+    assert data["show_id"] == "test-show"
+
+
+def test_playback_reset_when_idle_returns_409(client, auth_headers):
+    """Calling reset while idle must return 409 PLAYBACK_NOT_READY."""
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "PLAYBACK_NOT_READY"
+
+
+def test_playback_reset_when_stopped_returns_409(client, auth_headers, monkeypatch):
+    """Calling reset while stopped must return 409 PLAYBACK_NOT_READY."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "stopped")
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 409
+    assert r.json()["error"]["code"] == "PLAYBACK_NOT_READY"
+
+
+def test_playback_reset_from_paused_resumes_playback(client, auth_headers, monkeypatch):
+    """reset while paused must transition playback_state to 'playing'."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "paused")
+    monkeypatch.setitem(engine_adapter._state, "show_id", "test-show")
+    mock_mpv = MagicMock()
+    monkeypatch.setattr(engine_adapter, "_mpv", mock_mpv)
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["data"]["playback_state"] == "playing"
+    mock_mpv.resume.assert_called_once()
+
+
+def test_playback_reset_from_playing_does_not_call_resume(client, auth_headers, monkeypatch):
+    """reset while already playing must NOT call mpv.resume."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "playing")
+    mock_mpv = MagicMock()
+    monkeypatch.setattr(engine_adapter, "_mpv", mock_mpv)
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 200
+    mock_mpv.resume.assert_not_called()
+
+
+def test_playback_reset_clears_manual_state(client, auth_headers, monkeypatch):
+    """After reset, _manual_targets must be empty."""
+    monkeypatch.setitem(engine_adapter._state, "playback_state", "playing")
+    engine_adapter._manual_targets["strip_11"] = {
+        "target_id": "strip_11", "effect_type": "static", "color": [1.0, 1.0, 1.0]
+    }
+
+    r = client.post("/api/v1/playback/reset", headers=auth_headers)
+    assert r.status_code == 200
+    assert engine_adapter._manual_targets == {}
