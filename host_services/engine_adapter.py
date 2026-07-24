@@ -754,6 +754,7 @@ def scene_apply(scene_id: str,
         "accepted": True,
         "partial": False,
         "failed_targets": [],
+        "applied_entries": scene.get("entries", []),
     }, None
 
 
