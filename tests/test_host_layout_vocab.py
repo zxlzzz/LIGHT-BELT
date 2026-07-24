@@ -20,7 +20,7 @@ def _make_strip(strip_id: str):
 
 
 def _make_node(node_id: int):
-    return SimpleNamespace(node_id=node_id)
+    return SimpleNamespace(node_id=node_id, host=None)
 
 
 def _make_layout(strip_ids=("strip_11", "strip_22"), node_ids=(1, 2)):
