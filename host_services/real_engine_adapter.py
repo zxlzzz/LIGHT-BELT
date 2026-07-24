@@ -75,6 +75,7 @@ class RealEngineAdapter:
         self._manual_proc: subprocess.Popen | None = None
         self._aux_poll_thread: threading.Thread | None = None
         self._aux_stop_event = threading.Event()
+        self._active_show: dict | None = None
 
         # Temp file for manual show YAML (cleaned up on replace/stop).
         self._manual_yaml_tmp: str | None = None
@@ -83,11 +84,13 @@ class RealEngineAdapter:
 
     def on_playback_start(self, show: dict, start_ms: float | None) -> None:
         """Launch engine subprocess for show playback."""
+        self._active_show = show
         self._stop_manual()
         _kill_proc(self._playback_proc, "playback engine")
 
         show_yaml = show.get("show_yaml")
         media_path = show.get("media_path")
+        audio_path = show.get("audio_path")
 
         if not show_yaml:
             _log.warning("real adapter: show %r has no show_yaml; engine not started", show.get("show_id"))
@@ -102,7 +105,9 @@ class RealEngineAdapter:
             "--mpv-socket", self._mpv_socket,
         ]
         _AUDIO_SUFFIXES = {".mp3", ".wav", ".flac", ".ogg", ".aac"}
-        if media_path and Path(media_path).suffix.lower() in _AUDIO_SUFFIXES:
+        if audio_path:
+            cmd += ["--audio", audio_path]
+        elif media_path and Path(media_path).suffix.lower() in _AUDIO_SUFFIXES:
             cmd += ["--audio", media_path]
 
         _log.info("real adapter: starting playback engine: %s", " ".join(cmd))
@@ -127,10 +132,61 @@ class RealEngineAdapter:
         self._stop_aux_poll()
         _kill_proc(self._playback_proc, "playback engine")
         self._playback_proc = None
+        self._active_show = None
         self.stop_manual()
 
         from . import starry_sky
         starry_sky.ensure_off()
+
+    def on_playback_resume_yaml(self) -> bool:
+        """Kill manual engine and restart the show's light_engine subprocess.
+
+        The engine uses --clock mpv so it re-syncs to mpv's current position.
+        Returns False if no active show is cached.
+        """
+        if self._active_show is None:
+            return False
+        self._stop_manual()
+
+        show_yaml = self._active_show.get("show_yaml")
+        if not show_yaml:
+            return True
+
+        media_path = self._active_show.get("media_path")
+        audio_path = self._active_show.get("audio_path")
+
+        cmd = [
+            self._python, "-m", "light_engine",
+            "--config", self._profile,
+            "run",
+            "--show", show_yaml,
+            "--clock", "mpv",
+            "--mpv-socket", self._mpv_socket,
+        ]
+        _AUDIO_SUFFIXES = {".mp3", ".wav", ".flac", ".ogg", ".aac"}
+        if audio_path:
+            cmd += ["--audio", audio_path]
+        elif media_path and Path(media_path).suffix.lower() in _AUDIO_SUFFIXES:
+            cmd += ["--audio", media_path]
+
+        _log.info("real adapter: resuming playback engine: %s", " ".join(cmd))
+        _kill_proc(self._playback_proc, "playback engine")
+        self._playback_proc = subprocess.Popen(
+            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+        )
+        _drain_stderr(self._playback_proc, "playback-engine")
+        time.sleep(0.3)
+        if self._playback_proc.poll() is not None:
+            _log.error(
+                "real adapter: resumed playback engine exited immediately (exit code %s)",
+                self._playback_proc.returncode,
+            )
+
+        aux_triggers = self._active_show.get("aux_triggers") or []
+        if aux_triggers:
+            self._start_aux_poll(aux_triggers, 0)
+
+        return True
 
     # ── manual lights / effects ────────────────────────────────────────────────
 

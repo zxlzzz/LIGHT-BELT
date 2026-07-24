@@ -55,3 +55,15 @@ async def seek(body: SeekRequest, request: Request):
     if err:
         return error(request, err, "No show loaded", 409)
     return ok(request, data)
+
+
+@router.post("/reset")
+async def reset(request: Request):
+    data, err = engine_adapter.playback_reset()
+    if err:
+        if err == "PLAYBACK_NOT_READY":
+            return error(request, err, "No show is currently playing or paused", 409)
+        if err == "NO_ACTIVE_SHOW":
+            return error(request, err, "No active show to reset to", 409)
+        return error(request, err, f"Playback reset failed: {err}", 500)
+    return ok(request, data)

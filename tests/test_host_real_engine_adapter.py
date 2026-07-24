@@ -254,3 +254,73 @@ def test_build_manual_show_no_strip_ids_passes_all():
     cue_targets = [c["target"]["id"] for c in doc["show"]["cues"]]
     assert "anything" in cue_targets
     os.unlink(result)
+
+
+# ── on_playback_resume_yaml ───────────────────────────────────────────────────
+
+def test_playback_resume_yaml_restarts_subprocess(adapter):
+    """After playback → manual override, resume_yaml must spawn a new playback engine."""
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()):
+        adapter.on_playback_start(_SHOW_WITH_YAML, None)
+
+    states = [{"target_id": "strip_11", "effect_type": "static", "color": [1.0, 0.0, 0.0]}]
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()):
+        adapter.on_manual_command(states)
+
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()) as mock_popen:
+        result = adapter.on_playback_resume_yaml()
+
+    assert result is True
+    cmd = mock_popen.call_args[0][0]
+    assert "--clock" in cmd
+    assert "mpv" in cmd
+    assert "--show" in cmd
+    assert "/fake/show.yaml" in cmd
+
+
+def test_playback_resume_yaml_kills_manual_engine(adapter):
+    """resume_yaml must terminate the manual engine subprocess."""
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()):
+        adapter.on_playback_start(_SHOW_WITH_YAML, None)
+
+    mock_manual = MagicMock()
+    mock_manual.poll.return_value = None
+    adapter._manual_proc = mock_manual
+
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()):
+        adapter.on_playback_resume_yaml()
+
+    mock_manual.terminate.assert_called_once()
+
+
+def test_playback_resume_yaml_without_active_show_returns_false(adapter):
+    """Calling resume_yaml before any playback has started must return False."""
+    result = adapter.on_playback_resume_yaml()
+    assert result is False
+
+
+def test_playback_stop_clears_active_show(adapter):
+    """on_playback_stop must set _active_show to None."""
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()):
+        adapter.on_playback_start(_SHOW_WITH_YAML, None)
+    assert adapter._active_show is not None
+
+    with patch("host_services.starry_sky.ensure_off"):
+        adapter.on_playback_stop()
+
+    assert adapter._active_show is None
+
+
+def test_playback_start_caches_active_show(adapter):
+    """on_playback_start must cache the show dict in _active_show."""
+    with patch("host_services.real_engine_adapter.subprocess.Popen",
+               return_value=_make_mock_proc()):
+        adapter.on_playback_start(_SHOW_WITH_YAML, None)
+
+    assert adapter._active_show == _SHOW_WITH_YAML

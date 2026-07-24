@@ -117,6 +117,10 @@ class MpvClient:
     def set_mute(self, muted: bool):
         self._send(["set_property", "mute", muted])
 
+    def add_audio_track(self, path: str):
+        """Add an external audio file as the selected audio track."""
+        self._send(["audio-add", path, "select"])
+
 
 # ══════════════════════════════════════════════
 # 内存状态 —— Postman 测试时状态会随操作变化
@@ -141,10 +145,15 @@ _state = {
 }
 
 # Internal fields hidden from the /shows API response.
-_SHOW_INTERNAL_FIELDS = {"media_path", "show_yaml", "aux_triggers"}
+_SHOW_INTERNAL_FIELDS = {"media_path", "show_yaml", "aux_triggers", "audio_path"}
+
+# Overridable in tests via monkeypatch; None means use shows_loader discovery.
+_shows: list[dict] | None = None
 
 
 def _load_shows() -> list[dict]:
+    if _shows is not None:
+        return _shows
     from . import shows_loader
     return shows_loader.load_shows()
 
@@ -459,6 +468,10 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
         except MpvUnavailableError:
             return None, "MPV_UNAVAILABLE"
         mpv.play_file(show["media_path"])
+        if show.get("audio_path"):
+            if not _wait_until(lambda: mpv.get_duration() > 0, timeout_s=2.0):
+                _log.warning("mpv did not report duration in time; adding audio track anyway")
+            mpv.add_audio_track(show["audio_path"])
         if start_ms and start_ms > 0:
             if not _wait_until(lambda: mpv.get_duration() > 0, timeout_s=2.0):
                 _log.warning("mpv did not report duration in time; seeking anyway")
@@ -509,6 +522,23 @@ def playback_seek(position_ms: float) -> tuple[dict | None, str | None]:
         return None, "SHOW_NOT_LOADED"
     _ensure_mpv().seek(position_ms / 1000)
     _state["position_ms"] = position_ms
+    return _playback_data(), None
+
+
+def playback_reset() -> tuple[dict | None, str | None]:
+    """Resume the show's YAML lighting after a manual override.
+
+    Clears accumulated manual targets and restarts the show's light_engine
+    subprocess.  mpv is NOT restarted; the engine re-syncs via --clock mpv.
+    In mock mode (_real_adapter is None) only clears manual targets.
+    """
+    if _state["playback_state"] not in ("playing", "paused"):
+        return None, "PLAYBACK_NOT_READY"
+    _manual_targets.clear()
+    if _real_adapter is not None:
+        ok = _real_adapter.on_playback_resume_yaml()
+        if not ok:
+            return None, "NO_ACTIVE_SHOW"
     return _playback_data(), None
 
 
