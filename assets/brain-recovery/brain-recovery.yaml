@@ -1,0 +1,44 @@
+# Display name: 脑力恢复
+# Host scene source: audio volume 0.25, muted false; color temperature 4800 K.
+# Host-only values above are intentionally not part of show schema v2.
+# Physical color, brightness, and comfort remain NOT HARDWARE VERIFIED.
+schema_version: 2
+show:
+  id: brain-recovery
+  duration: 120.0
+  defaults:
+    fade_in: 0.0
+    fade_out: 0.0
+    blend: replace
+    min_effect_hold: 0.0
+    switch_cooldown: 0.0
+  brightness_tracks:
+  - id: brain_recovery_brightness
+    target:
+      type: digital_set
+      ids: [strip_32, strip_31, strip_41, strip_43, strip_44, strip_11, strip_12, strip_21, strip_22]
+    start: 0.0
+    end: 120.0
+    interpolation: step
+    keyframes:
+    - {time: 0.0, value: 0.4}
+    - {time: 120.0, value: 0.4}
+  cues:
+  - id: brain_recovery_static
+    start: 0.0
+    end: 120.0
+    priority: 10
+    target:
+      type: digital_set
+      ids: [strip_32, strip_31, strip_41, strip_43, strip_44, strip_11, strip_12, strip_21, strip_22]
+    effect:
+      mode: fixed
+      id: static
+      params: {}
+    color:
+      mode: solid
+      color: [0.7058823529, 0.7843137255, 1.0]
+    transition:
+      fade_in: 3.0
+      fade_out: 0.0
+      blend: replace
