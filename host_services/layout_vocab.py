@@ -10,6 +10,8 @@ from __future__ import annotations
 from light_engine.mapping import Layout
 
 STARRY_SKY_TARGET_ID = "starry_sky"
+WLED_DEVICE_TYPE = "wled_board"
+CUSTOM_UDP_V3_DEVICE_TYPE = "custom_esp32_udp_v3"
 
 # Chinese display names for known target IDs.
 # Targets not listed here fall back to their logical ID (safe for future strips).
@@ -54,17 +56,21 @@ def derive_capabilities_targets(layout: Layout) -> list[dict]:
     })
     return targets
 
-def derive_device_list(layout: Layout) -> list[dict]:
+def derive_device_list(layout: Layout, device_type: str = WLED_DEVICE_TYPE) -> list[dict]:
+    if not isinstance(device_type, str) or not device_type:
+        raise ValueError("device_type must be a non-empty string")
     devices = []
     for node in layout.digital_nodes:
+        enabled = getattr(node, "enabled", True)
         devices.append({
             "device_id": f"node_{node.node_id}",
-            "device_type": "wled_board",
+            "device_type": device_type,
+            "enabled": enabled,
             "host": node.host,            # ← 新增
             "status": "offline",
             "last_output_ms": 0,
             "last_seen_ms": 0,
             "connection_confirmed": False,
-            "error_code": None,
+            "error_code": None if enabled else "MDNS_UNRESOLVED",
         })
     return devices

@@ -9,7 +9,28 @@ is preserved at
 longer an active instruction source. Phases 30 and 31 are complete. No later
 implementation phase is currently approved.
 
-## Phase 31: One ESP32 per WS2811 strip
+## Current deployment override
+
+This section supersedes the Phase 31 production wording below. The sole
+current/default deployment is DDP to nine independent WLED boards with no
+analog zones/nodes or RS-485: `1/strip_32/40`, `2/strip_41/10`,
+`3/strip_44/20`, `4/strip_12/40`, `5/strip_22/40`, `6/strip_31/10`,
+`7/strip_43/20`, `8/strip_11/10`, and `9/strip_21/10`. Each board has exactly
+`output_id: 1`; GPIO16 is topology metadata only. **NOT HARDWARE VERIFIED.**
+
+Real-mode Host startup selects `config/runtime/wled-ddp-mdns.yaml` by default
+and resolves only that WLED runtime Profile through Avahi
+`wled-strip-<label>.local` names. A missing mDNS result disables only that
+node, while the API keeps the nine-strip vocabulary. No old-IP/cache, HTTP,
+MAC-derived-name, or subnet-scan fallback is permitted.
+
+UDP v3 is custom-firmware maintenance only through
+`config/profiles/udp-v3-nine-strip-maintenance.yaml`; WLED is not a UDP v3
+receiver. Stop output, set `ENGINE_PROFILE_PATH`, and restart the Host to
+switch Profile. The APP has no hot-switch. The Phase 31 material below is
+historical compatibility, not current production. **NOT HARDWARE VERIFIED.**
+
+## Historical Phase 31: One ESP32 per WS2811 strip
 
 Replace the provisional five-controller, multi-output production topology with
 one ESP32-S3 per physical WS2811 strip. The complete target has 13 digital

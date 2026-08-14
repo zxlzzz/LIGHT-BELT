@@ -1,3 +1,27 @@
+## Current deployment override
+
+This section supersedes current/production wording in the historical sections
+below. The sole current/default production chain is DDP RGB24 to nine
+independent WLED boards with no RGB+CCT zones, analog nodes, STM32 devices, or
+RS-485 transport: `1/strip_32/40`, `2/strip_41/10`, `3/strip_44/20`,
+`4/strip_12/40`, `5/strip_22/40`, `6/strip_31/10`, `7/strip_43/20`,
+`8/strip_11/10`, and `9/strip_21/10`. Every board has only `output_id: 1`;
+GPIO16 is topology metadata only. **NOT HARDWARE VERIFIED.**
+
+The Host defaults to the ignored runtime Profile
+`config/runtime/wled-ddp-mdns.yaml`. Avahi resolves unique
+`wled-strip-<label>.local` names; a missing result disables only that board and
+DDP sends the remaining complete node frames. No cached/old IP, HTTP identity
+check, MAC-derived hostname, or subnet scan is permitted. The Host API retains
+all nine `strip_*` targets.
+
+UDP v3 is limited to the custom-firmware maintenance Profile
+`config/profiles/udp-v3-nine-strip-maintenance.yaml`; WLED does not receive
+this protocol. Stop output, set `ENGINE_PROFILE_PATH`, and restart the Host to
+change Profile. The APP has no live switch. All remaining 13-node,
+RGB+CCT/STM32/RS-485, and UDP v3 production material in this specification is
+historical compatibility only, not current production. **NOT HARDWARE
+VERIFIED.**
 # LIGHT-BELT 舱体灯光实体闭环改造任务书
 
 > 本文件用于交给 Claude Code。它定义系统目标、架构边界、协议、约束和验收条件，不规定逐行实现方式。请在 LIGHT-BELT 仓库根目录使用 Plan Mode 阅读本文件。

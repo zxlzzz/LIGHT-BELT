@@ -9,7 +9,7 @@ show:
     min_effect_hold: 0.0
     switch_cooldown: 0.0
   brightness_tracks:
-  - id: zone_32_dim_62_85
+  - id: strip_32_dim_62_85
     target:
       type: digital_strip
       id: strip_32
@@ -41,7 +41,7 @@ show:
       value: 0.8
     - time: 86.0
       value: 1.0
-  - id: zone_32_dim_phase3
+  - id: strip_32_dim_phase3
     target:
       type: digital_strip
       id: strip_32
