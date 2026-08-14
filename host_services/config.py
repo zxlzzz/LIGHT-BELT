@@ -64,3 +64,43 @@ SERVICE_NAME = "light-belt-host"
 HOST_ID = "rk3588-main"
 API_VERSION = "1.0"
 SERVICE_VERSION = "1.0.0"
+
+
+# ── Git commit（远程运维用：现场板子当前 checkout 的 commit）──
+def _read_git_commit() -> str:
+    """读取当前 checkout 的 git commit 短哈希。
+
+    直接读 .git 文件而非 fork `git`，因此不依赖 git 二进制在 PATH、
+    也不会在每次 /status 请求时创建子进程。任何失败都降级为 "unknown"，
+    绝不让版本探测异常炸掉 status 端点。
+    """
+    try:
+        repo_root = _pl.Path(__file__).resolve().parent.parent
+        git_dir = repo_root / ".git"
+        if not git_dir.exists():
+            return "unknown"
+        head = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
+        if head.startswith("ref:"):
+            ref = head.split(":", 1)[1].strip()
+            ref_path = git_dir / ref
+            if ref_path.exists():
+                sha = ref_path.read_text(encoding="utf-8").strip()
+            else:
+                packed = git_dir / "packed-refs"
+                sha = "unknown"
+                if packed.exists():
+                    for line in packed.read_text(encoding="utf-8").splitlines():
+                        if line.endswith(" " + ref):
+                            sha = line.split(" ", 1)[0].strip()
+                            break
+        else:
+            sha = head
+        if sha and sha != "unknown" and len(sha) >= 7:
+            return sha[:12]
+        return "unknown"
+    except Exception:
+        return "unknown"
+
+
+# 启动时计算一次并缓存（进程生命周期内不变；git pull 后需重启服务才更新）
+GIT_COMMIT: str = _read_git_commit()

@@ -355,12 +355,13 @@ def _apply_manual_targets() -> None:
 # ══════════════════════════════════════════════
 
 def get_status() -> dict:
-    from .config import SERVICE_NAME, HOST_ID, API_VERSION, SERVICE_VERSION
+    from .config import SERVICE_NAME, HOST_ID, API_VERSION, SERVICE_VERSION, GIT_COMMIT
     return {
         "service": SERVICE_NAME,
         "host_id": HOST_ID,
         "api_version": API_VERSION,
         "version": SERVICE_VERSION,
+        "commit": GIT_COMMIT,
         "time_ms": _now_ms(),
     }
 
