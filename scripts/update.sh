@@ -17,7 +17,7 @@ VENV_PIP="$REPO/.venv/bin/pip"
 SERVICE="light-belt-host.service"
 HEALTH_URL="http://127.0.0.1:8443/api/v1/status"
 LOG="/home/topeet/lb-update.log"
-HEALTH_RETRIES=10
+HEALTH_RETRIES=20
 HEALTH_INTERVAL=3
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
