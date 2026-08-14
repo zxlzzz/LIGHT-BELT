@@ -117,4 +117,3 @@ else
     log "==== update 结束（回滚后仍失败）===="
     exit 2
 fi
-# update.sh 链路验证 20260814-1531
