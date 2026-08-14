@@ -26,6 +26,7 @@ class DigitalNodeMapping:
     pixel_count: int
     max_udp_payload: int = 4096
     protocol_version: int = 2
+    enabled: bool = True
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,7 @@ class DigitalNodeFrame:
     node_id: int
     host: str
     port: int
+    enabled: bool = True
     # ``pixels`` is retained solely for UDP v2/legacy layouts.  UDP v3 uses
     # ``outputs`` and never joins independent strips into one pixel stream.
     pixels: list[tuple[float, float, float]] = field(default_factory=list)
@@ -131,7 +133,13 @@ class PhysicalMapping:
 
     def _validate(self) -> None:
         expected_analog_nodes = 1 if getattr(self._layout, "topology_version", 2) == 3 else 6
-        if len(self._analog_nodes) != expected_analog_nodes:
+        permits_zero_analog = (
+            getattr(self._layout, "digital_output_policy", None)
+            in {"one_output_wled", "one_output_gpio4"}
+            and not self._analog_nodes
+            and not self._zone_ids
+        )
+        if len(self._analog_nodes) != expected_analog_nodes and not permits_zero_analog:
             raise ValueError(f"Layout must define exactly {expected_analog_nodes} analog nodes")
         if getattr(self._layout, "topology_version", 2) == 3 and any(
             node.protocol_version != 3 for node in self._digital_nodes
@@ -182,6 +190,8 @@ class PhysicalMapping:
                     f"{locator}: field 'max_udp_payload' = {node.max_udp_payload!r}, "
                     f"expected >= physical payload size {node.pixel_count * 3}"
                 )
+            if type(node.enabled) is not bool:
+                raise ValueError(f"{locator}: enabled must be a boolean")
 
         if self._digital_outputs:
             self._validate_v3_outputs(node_by_id)
@@ -378,6 +388,7 @@ class PhysicalMapping:
                 node_id=node.node_id,
                 host=node.host,
                 port=node.port,
+                enabled=node.enabled,
                 pixels=(
                     [] if node.protocol_version == 3 else digital_pixels[node.node_id]
                 ),

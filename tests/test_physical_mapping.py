@@ -38,6 +38,28 @@ def _layout(
     )
 
 
+def test_zero_analog_topology_requires_a_one_output_policy() -> None:
+    for policy in ("one_output_wled", "one_output_gpio4"):
+        PhysicalMapping(
+            Layout(
+                topology_version=3,
+                digital_output_policy=policy,
+                zones=[],
+                analog_nodes=[],
+            )
+        )
+
+    with pytest.raises(ValueError, match="exactly 1 analog nodes"):
+        PhysicalMapping(
+            Layout(
+                topology_version=3,
+                digital_output_policy="multi_output_diagnostic",
+                zones=[],
+                analog_nodes=[],
+            )
+        )
+
+
 def _base_config_data() -> dict:
     return {
         "layout": {

@@ -442,7 +442,7 @@ def validate_config(data: dict[str, Any]) -> None:
             layout.get("digital_output_policy"),
             "layout",
             "digital_output_policy",
-            ["multi_output_diagnostic", "one_output_gpio4"],
+            ["multi_output_diagnostic", "one_output_gpio4", "one_output_wled"],
         )
         if topology_version != 3:
             raise ConfigError(
@@ -478,7 +478,10 @@ def validate_config(data: dict[str, Any]) -> None:
                 "scheduled for one_output_gpio4 production",
             )
     expected_analog_nodes = 1 if topology_version == 3 else 6
-    if len(analog_nodes) != expected_analog_nodes:
+    rs485_enabled = "rs485_v2" in seen_outputs
+    if len(analog_nodes) != expected_analog_nodes and not (
+        not rs485_enabled and not analog_nodes and not zones
+    ):
         raise ConfigError(
             "layout", "analog_nodes", len(analog_nodes), f"exactly {expected_analog_nodes}"
         )
@@ -509,6 +512,9 @@ def validate_config(data: dict[str, Any]) -> None:
             raise ConfigError(path, "node_id", node_id, "globally unique node id")
         used_node_ids[node_id] = path
         host = _require_ipv4_or_hostname(node.get("host"), path, "host")
+        enabled_value = node.get("enabled", True)
+        if type(enabled_value) is not bool:
+            raise ConfigError(path, "enabled", enabled_value, "boolean")
         port = _require_int(node.get("port"), path, "port", 1)
         if port > 65535:
             raise ConfigError(path, "port", port, "integer in [1, 65535]")
@@ -606,12 +612,12 @@ def validate_config(data: dict[str, Any]) -> None:
             node_id = _require_int(output.get("node_id"), path, "node_id", 1)
             output_id = _require_int(output.get("output_id"), path, "output_id", 1)
             gpio = _require_int(output.get("gpio"), path, "gpio", 0)
-            if digital_output_policy == "one_output_gpio4" and output_id != 1:
+            if digital_output_policy in {"one_output_gpio4", "one_output_wled"} and output_id != 1:
                 raise ConfigError(
                     path,
                     "output_id",
                     output_id,
-                    "1 under layout.digital_output_policy 'one_output_gpio4'",
+                    "1 under layout.digital_output_policy 'one_output_gpio4' or 'one_output_wled'",
                 )
             if digital_output_policy == "one_output_gpio4" and gpio != 4:
                 raise ConfigError(
@@ -637,7 +643,7 @@ def validate_config(data: dict[str, Any]) -> None:
                 raise ConfigError(path, "strip_id", strip_id, "unique complete strip mapping")
             seen_strips.add(strip_id)
             by_node.setdefault(node_id, []).append({"output_id": output_id, "gpio": gpio, "pixel_count": pixel_count})
-        if digital_output_policy == "one_output_gpio4":
+        if digital_output_policy in {"one_output_gpio4", "one_output_wled"}:
             for node_id in digital_node_lengths:
                 if len(by_node.get(node_id, ())) != 1:
                     raise ConfigError(
@@ -645,7 +651,7 @@ def validate_config(data: dict[str, Any]) -> None:
                         "node_id",
                         node_id,
                         "exactly one output per digital node under "
-                        "layout.digital_output_policy 'one_output_gpio4'",
+                        "layout.digital_output_policy 'one_output_gpio4' or 'one_output_wled'",
                     )
         if seen_strips != set(strip_lengths):
             raise ConfigError("layout", "digital_outputs", sorted(set(strip_lengths) - seen_strips), "every logical strip mapped exactly once")

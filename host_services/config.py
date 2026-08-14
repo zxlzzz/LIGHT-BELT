@@ -29,10 +29,10 @@ SHOWS_MANIFEST_PATH = "data/shows_manifest.json"  # 运行时数据，不进 git
 
 # ── 引擎 ──
 import pathlib as _pl
-_DEFAULT_PROFILE = str(
-    _pl.Path(__file__).resolve().parent.parent
-    / "config" / "profiles" / "rk3588-host-service.yaml"
-)
+_REPO_ROOT = _pl.Path(__file__).resolve().parent.parent
+WLED_RUNTIME_PROFILE = _REPO_ROOT / "config" / "runtime" / "wled-ddp-mdns.yaml"
+WLED_TEMPLATE_PROFILE = _REPO_ROOT / "config" / "profiles" / "rk3588-host-service.yaml"
+_DEFAULT_PROFILE = str(WLED_RUNTIME_PROFILE)
 ENGINE_PROFILE_PATH: str = os.environ.get("ENGINE_PROFILE_PATH", _DEFAULT_PROFILE)
 # "mock" (default, in-memory) or "real" (subprocess light_engine)
 ENGINE_ADAPTER: str = os.environ.get("ENGINE_ADAPTER", "mock")

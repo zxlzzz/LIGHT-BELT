@@ -142,6 +142,8 @@ class DdpOutput(LightOutput):
         frame_ok = True
         safe_state = frame.metadata.get("SAFE_STATE") is True
         for digital_frame in frame.digital_frames:
+            if not digital_frame.enabled:
+                continue
             try:
                 pixels = self._node_pixels(digital_frame)
                 for packet in encode_ddp_packets(pixels, sequence=frame.sequence):

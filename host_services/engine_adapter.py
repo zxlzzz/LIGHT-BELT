@@ -21,15 +21,30 @@ from typing import Any
 from .config import (
     SCENE_MAX_COUNT, SCENE_FILE_PATH, SHOWS_MANIFEST_PATH,
     ENGINE_PROFILE_PATH, ENGINE_ADAPTER, VIDEO_DETECT_ENABLED,
+    WLED_RUNTIME_PROFILE, WLED_TEMPLATE_PROFILE,
     BRIGHTNESS_SCALE_DEFAULT, WLED_HTTP_TIMEOUT_S,
 )
 from .schemas import VALID_EFFECT_TYPES
 
 _log = logging.getLogger(__name__)
 
+WLED_DEVICE_TYPE = "wled_board"
+CUSTOM_UDP_V3_DEVICE_TYPE = "custom_esp32_udp_v3"
+
 
 class MpvUnavailableError(RuntimeError):
     """Raised when mpv cannot be started or its socket directory cannot be created."""
+
+
+def _device_type_from_outputs(enabled_outputs: list[str]) -> str:
+    selected = set(enabled_outputs) & {"ddp", "udp_v3"}
+    if selected == {"ddp"}:
+        return WLED_DEVICE_TYPE
+    if selected == {"udp_v3"}:
+        return CUSTOM_UDP_V3_DEVICE_TYPE
+    raise ValueError(
+        "outputs.enabled must select exactly one of ddp or udp_v3 for Host device typing"
+    )
 
 
 # ══════════════════════════════════════════════
@@ -43,12 +58,16 @@ def _load_layout_vocab():
         from light_engine.config import Config as _Config
         from light_engine.mapping import Layout
         from .layout_vocab import derive_target_ids, derive_capabilities_targets, derive_device_list
-        config = _Config.get_instance(_Path(ENGINE_PROFILE_PATH))
+        profile_path = _Path(ENGINE_PROFILE_PATH)
+        if not profile_path.exists() and profile_path.resolve() == WLED_RUNTIME_PROFILE.resolve():
+            profile_path = WLED_TEMPLATE_PROFILE
+        config = _Config.get_instance(profile_path)
         layout = Layout.from_config(config)
+        device_type = _device_type_from_outputs(config.get("outputs.enabled", []))
         return (
             derive_target_ids(layout),
             derive_capabilities_targets(layout),
-            derive_device_list(layout),
+            derive_device_list(layout, device_type=device_type),
         )
     except Exception as exc:
         _log.warning(
@@ -63,21 +82,26 @@ def _run_resolve_nodes() -> None:
     if ENGINE_ADAPTER != "real":
         return
     from pathlib import Path as _P
+    if _P(ENGINE_PROFILE_PATH).resolve() != WLED_RUNTIME_PROFILE.resolve():
+        return
     script = _P(__file__).resolve().parent.parent / "scripts" / "resolve_nodes.py"
     if not script.exists():
-        _log.warning("resolve_nodes.py not found at %s; skipping", script)
-        return
+        raise RuntimeError(f"resolve_nodes.py not found at {script}")
     try:
         result = subprocess.run(
-            [sys.executable, str(script), "--out", ENGINE_PROFILE_PATH],
+            [sys.executable, str(script), "--template", str(WLED_TEMPLATE_PROFILE), "--out", ENGINE_PROFILE_PATH],
             timeout=30,
             capture_output=True,
             text=True,
         )
         for line in (result.stderr or "").splitlines():
             _log.info("[resolve_nodes] %s", line)
+        if result.returncode:
+            raise RuntimeError(
+                f"resolve_nodes.py exited with {result.returncode}: {result.stderr or ''}".strip()
+            )
     except Exception as exc:
-        _log.warning("resolve_nodes.py failed: %s", exc)
+        raise RuntimeError(f"resolve_nodes.py failed: {exc}") from exc
 
 
 _valid_target_ids: frozenset[str]
@@ -232,7 +256,7 @@ def _push_brightness_scale() -> None:
     """Send current brightness_scale to all WLED nodes (fire-and-forget)."""
     from . import wled_brightness
     scale = _state["brightness_scale"]
-    hosts_devices = [d for d in _devices if d.get("host")]
+    hosts_devices = [d for d in _devices if d.get("host") and d.get("enabled", True) and d.get("device_type") == WLED_DEVICE_TYPE]
     if hosts_devices:
         wled_brightness.apply_scale(hosts_devices, scale, WLED_HTTP_TIMEOUT_S)
 
@@ -244,7 +268,7 @@ def _push_wled_off() -> None:
     表现为节目结束后灯带全黄。显式发 {"on": false} 消掉这个回落。
     """
     from . import wled_brightness
-    hosts_devices = [d for d in _devices if d.get("host")]
+    hosts_devices = [d for d in _devices if d.get("host") and d.get("enabled", True) and d.get("device_type") == WLED_DEVICE_TYPE]
     if hosts_devices:
         wled_brightness.apply_off(hosts_devices, WLED_HTTP_TIMEOUT_S)
 
@@ -255,6 +279,13 @@ def _probe_devices() -> None:
     """Ping each WLED node's HTTP API; update status in-place."""
     t = _now_ms()
     for d in _devices:
+        if not d.get("enabled", True):
+            d["status"] = "offline"
+            d["connection_confirmed"] = False
+            d["error_code"] = "MDNS_UNRESOLVED"
+            continue
+        if d.get("device_type") != WLED_DEVICE_TYPE:
+            continue
         host = d.get("host")
         if not host:
             continue
@@ -271,7 +302,8 @@ def _probe_devices() -> None:
 def _mark_devices_output() -> None:
     t = _now_ms()
     for d in _devices:
-        d["last_output_ms"] = t
+        if d.get("enabled", True):
+            d["last_output_ms"] = t
 
 
 # ══════════════════════════════════════════════

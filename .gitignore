@@ -27,6 +27,7 @@ logs/
 artifacts/runs/
 data/
 /config/profiles/site-profile.yaml
+/config/runtime/
 /mpv-shot*.jpg
 /tests/fixtures/audio/generated_show_orchestration/
 
