@@ -1,34 +1,32 @@
 # LIGHT-BELT
 
-LIGHT-BELT is the RK3588-hosted lighting controller for the provisional cabin
-installation: 13 independent 24V WS2811 RGB strips, each on its own ESP32-S3,
-and one RGB+CCT COB zone through STM32 RS-485. Every production ESP32 has one
-UDP v3 output (`output_id: 1`) on GPIO4; the protocol retains its general
-one-to-three-output capability.
+LIGHT-BELT's current/default deployment is DDP to nine independent WLED
+boards: node 1 `strip_32` (40), node 2 `strip_41` (10), node 3 `strip_44`
+(20), node 4 `strip_12` (40), node 5 `strip_22` (40), node 6 `strip_31`
+(10), node 7 `strip_43` (20), node 8 `strip_11` (10), and node 9 `strip_21`
+(10). Every board has only `output_id: 1`; GPIO16 is topology metadata only.
+This Profile has no RGB+CCT zones, analog nodes, STM32 devices, or RS-485
+transport. **NOT HARDWARE VERIFIED.**
 
 The topology, protocol, and scheduled-presentation software contracts are
 accepted by the final regression suite.
 Physical wiring, endpoint assignment, power distribution, cross-node timing,
 and visible output remain **NOT HARDWARE VERIFIED**.
 
-All production UDP v3 node packets for one logical frame share sequence,
-media time, and one Host-monotonic `apply_at_us` 20 ms in the future. A
-broadcast clock beacon lets each ESP32 convert that deadline into its local
-clock using the minimum offset in a bounded sample window; firmware pre-encodes
-the frame and compensates the 10/20/40-group SPI wire times before completing
-the WS2811 latch at the shared deadline.
-Production images require this scheduled path, while explicit diagnostics
-remain immediate. The scheduling software is implemented; actual multi-node
-latch skew is still **NOT HARDWARE VERIFIED** and requires powered logic
-analyzer acceptance.
+The Host default is the ignored runtime Profile
+`config/runtime/wled-ddp-mdns.yaml`. In real mode it runs
+`scripts/resolve_nodes.py` against the tracked WLED template, resolving unique
+Avahi names `wled-strip-<label>.local`. An unresolved board is disabled; DDP
+continues to every other board without stale-address/cache, HTTP, MAC-derived,
+or subnet-scan fallback. All nine `strip_*` targets remain available to the
+Host API. **NOT HARDWARE VERIFIED.**
 
-At scheduled session start, sequence 1 is fully encoded for every node before
-any packet is sent, then delivered in three byte-identical per-node rounds 2 ms
-apart with one apply/media identity. Firmware deduplicates those copies
-idempotently. A fully prepared KEY admits the session; a later physical-output
-failure rolls back but lets the next complete scheduled frame recover. The
-output loop checks safe timeout every pass and never blindly retries scheduled
-SPI after its deadline.
+`config/profiles/udp-v3-nine-strip-maintenance.yaml` is for custom UDP v3
+firmware only; WLED cannot receive project UDP v3. Stop output, select a
+Profile through `ENGINE_PROFILE_PATH`, and restart the Host to change modes.
+The APP has no live transport/Profile switch. The older 13-controller,
+RGB+CCT/STM32, RS-485, and UDP v3 production descriptions below are historical
+compatibility material, not the current/default installation.
 
 ## Start here
 
@@ -44,19 +42,18 @@ Use only the bundled Windows interpreter:
 
 ```powershell
 .\.python\Scripts\python.exe -m light_engine `
-  --config config/profiles/cabin-lighting-v3-production.yaml `
+  --config config/profiles/rk3588-host-service.yaml `
   validate-show --show config/shows/cabin-show-v2.yaml
 
 .\.python\Scripts\python.exe -m light_engine `
-  --config config/profiles/cabin-lighting-v3-production.yaml `
+  --config config/profiles/rk3588-host-service.yaml `
   inspect-topology --show config/shows/cabin-show-v2.yaml
 ```
 
-The production profile intentionally contains placeholder endpoints and fails
-explicitly until real installation values are supplied. Memory and fake
-transports require explicit configuration.
+The tracked WLED template uses mDNS names; production uses its generated
+runtime Profile. Memory and fake transports require explicit configuration.
 
-The current field subset uses
+Historical compatibility field material uses
 `config/profiles/ws2811-installed-one-esp-per-strip.yaml`: nodes 1, 2, 4, 5,
 6, 7, 8, 9, and 10 at `192.168.31.201` through `.210` with the unused node 3
 address omitted. The complete target also reserves nodes 3, 11, 12, and 13 at
@@ -64,9 +61,8 @@ address omitted. The complete target also reserves nodes 3, 11, 12, and 13 at
 not change when physical nodes change. All endpoint and visible-output claims
 remain **NOT HARDWARE VERIFIED**.
 
-Use `config/shows/ws2811-stage3-installed-300s.yaml` for the current nine-node
-digital acceptance scope and `config/shows/ws2811-stage3-full-300s.yaml` only
-for a physically complete thirteen-node digital scope.
+The listed UDP v3 shows and Profiles are historical compatibility material;
+they are not the current WLED/DDP deployment path.
 
 ## Repository map
 

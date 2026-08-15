@@ -219,6 +219,7 @@ def create_outputs(config: Any) -> dict[str, LightOutput]:
         digital_nodes = config.get("layout.digital_nodes", [])
         beacon_addresses = tuple(
             (node["host"], beacon_port) for node in digital_nodes
+            if node.get("enabled", True)
         )
         outputs["udp_v3"] = UdpOutputV3(
             mode=mode,

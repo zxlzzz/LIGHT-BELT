@@ -1,6 +1,28 @@
-﻿# LIGHT-BELT project instructions
+# LIGHT-BELT project instructions
 
-## Mission
+## Current production deployment override
+
+This section overrides older topology and production wording elsewhere in this
+file. The sole current/default deployment is DDP to nine independent WLED
+boards: node 1 `strip_32` (40), node 2 `strip_41` (10), node 3 `strip_44`
+(20), node 4 `strip_12` (40), node 5 `strip_22` (40), node 6 `strip_31`
+(10), node 7 `strip_43` (20), node 8 `strip_11` (10), and node 9 `strip_21`
+(10). Every board has only `output_id: 1`; GPIO16 is topology metadata only.
+There are no analog zones/nodes, STM32 devices, or RS-485 transport in this
+Profile. **NOT HARDWARE VERIFIED.**
+
+The Host default is the resolver-generated,
+ignored `config/runtime/wled-ddp-mdns.yaml`. Avahi resolves the unique names
+`wled-strip-<label>.local`; an unresolved node is explicitly disabled and DDP
+skips only it, without MAC-derived names, HTTP checks, cached/old IP fallback,
+or subnet scanning. The Host retains all nine `strip_*` API targets.
+
+`config/profiles/udp-v3-nine-strip-maintenance.yaml` is custom-firmware
+maintenance only. WLED does not receive project UDP v3. Stop output, set
+`ENGINE_PROFILE_PATH`, and restart the Host to change Profile; the APP has no
+hot-switch. All physical behavior is **NOT HARDWARE VERIFIED**.
+
+## Historical compatibility mission (not current production)
 
 Build a reliable RK3588-hosted, video/music-driven lighting controller for the
 2100 mm x 1000 mm x 1800 mm cabin installation:
@@ -14,7 +36,7 @@ They are the approved configurable contract, not proof of installed wiring.
 
 RK3588 is the only production brain. RK3568 is backup/testing only.
 
-## Hardware truth
+## Historical compatibility hardware truth (not current production)
 
 Analog COB is not RGBW. It is six-wire common-anode RGB+CCT:
 
@@ -54,7 +76,7 @@ All placement, length, and WS2811 group values in this table are
 
 The 13 digital runs total 260 independently addressable WS2811 groups.
 
-### Production controller and electrical contract
+### Historical Phase 31 controller and electrical contract
 
 Production uses one ESP32-S3 per WS2811 strip. Each node has exactly one
 production output: `output_id: 1` on GPIO4. Node allocation is physical
@@ -117,7 +139,7 @@ remain configurable and `NOT HARDWARE VERIFIED`.
 - Apply brightness exactly once.
 - Do not claim hardware verification without real evidence.
 
-## Protocols
+## Historical compatibility protocols
 
 RS-485 v2 is the documented 16-byte RGB+CCT frame using:
 

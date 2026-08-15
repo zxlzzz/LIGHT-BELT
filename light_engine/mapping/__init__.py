@@ -92,6 +92,7 @@ class Layout:
     digital_segments: list[DigitalSegmentMapping] = field(default_factory=list)
     digital_outputs: list[DigitalOutputMapping] = field(default_factory=list)
     topology_version: int = 2
+    digital_output_policy: str | None = None
     virtual_paths: tuple[VirtualPath, ...] = ()
     video_zone_map: dict[str, list[str]] = field(default_factory=dict)
 
@@ -102,6 +103,7 @@ class Layout:
             config = Config.get_instance()
         layout = cls()
         layout.topology_version = config.get("layout.topology_version", 2)
+        layout.digital_output_policy = config.get("layout.digital_output_policy")
 
         # Load digital strips
         strips_data = config.get("layout.strips", [])
@@ -194,6 +196,7 @@ class Layout:
                     protocol_version=_optional_int(
                         item, "protocol_version", path, 2, 2
                     ),
+                    enabled=item.get("enabled", True),
                 ))
         elif self.strips:
             port = config.get("outputs.udp.port", 9001)

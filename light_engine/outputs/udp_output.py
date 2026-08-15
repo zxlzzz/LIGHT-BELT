@@ -392,6 +392,8 @@ class UdpOutputV3(UdpOutputV2):
             raise
         encoded_datagrams: list[tuple[bytes, tuple[str, int]]] = []
         for digital_frame in frame.digital_frames:
+            if not digital_frame.enabled:
+                continue
             try:
                 if not digital_frame.outputs:
                     raise ValueError(

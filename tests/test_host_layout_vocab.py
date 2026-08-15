@@ -131,3 +131,15 @@ def test_derive_device_list_single_node():
     devices = derive_device_list(layout)
     assert len(devices) == 1
     assert devices[0]["device_id"] == "node_5"
+
+
+def test_derive_device_list_marks_mdns_disabled_node_offline():
+    layout = _make_layout(strip_ids=("strip_11",), node_ids=(1,))
+    layout.digital_nodes[0].enabled = False
+
+    device = derive_device_list(layout)[0]
+
+    assert device["enabled"] is False
+    assert device["status"] == "offline"
+    assert device["connection_confirmed"] is False
+    assert device["error_code"] == "MDNS_UNRESOLVED"
