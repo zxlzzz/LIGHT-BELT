@@ -1,11 +1,11 @@
-# Display name: 美容护肤
-# Host scene source: audio volume 0.20, muted false; color temperature 3000 K.
-# Host-only values above are intentionally not part of show schema v2.
-# Physical color, brightness, and comfort remain NOT HARDWARE VERIFIED.
+# phase-2 - extracted from energy-wakeup.yaml.
+# Time window: 90.0-143.0s in the source; re-based to 0-53.0s here.
+# Cues: 32  Brightness tracks: 1  Duration: 53.0s
+
 schema_version: 2
 show:
-  id: beauty-care
-  duration: 120.0
+  id: energy-wakeup-phase-2
+  duration: 53.0
   defaults:
     fade_in: 0.0
     fade_out: 0.0
@@ -13,32 +13,815 @@ show:
     min_effect_hold: 0.0
     switch_cooldown: 0.0
   brightness_tracks:
-  - id: beauty_care_brightness
+  - id: strip_32_dim_phase3
     target:
-      type: digital_set
-      ids: [strip_32, strip_31, strip_41, strip_43, strip_44, strip_11, strip_12, strip_21, strip_22]
-    start: 0.0
-    end: 120.0
-    interpolation: step
+      type: digital_strip
+      id: strip_32
+    start: 41.0
+    end: 53.0
+    interpolation: linear
     keyframes:
-    - {time: 0.0, value: 0.3}
-    - {time: 120.0, value: 0.3}
+    - time: 41.0
+      value: 1.0
+    - time: 42.0
+      value: 0.8
+    - time: 53.0
+      value: 0.8
   cues:
-  - id: beauty_care_static
+  - id: phase2_p1_11_chase
     start: 0.0
-    end: 120.0
+    end: 21.0
     priority: 10
     target:
-      type: digital_set
-      ids: [strip_32, strip_31, strip_41, strip_43, strip_44, strip_11, strip_12, strip_21, strip_22]
+      type: digital_strip
+      id: strip_11
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: forward
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_12_breath
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_12
+    origin: start
+    effect:
+      mode: fixed
+      id: breath
+      params:
+        period: 4
+        min_brightness: 0.1
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_21_chase
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_21
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: reverse
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_31_chase
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_31
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: forward
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_41_chase
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_41
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: reverse
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_42_wipe
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.04
+      - 0.04
+      - 0.05
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_43_wipe
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_44_wipe
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_44
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_45_wipe
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_44
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p1_93_wipe
+    start: 0.0
+    end: 21.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_11_chase
+    start: 21.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_11
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: forward
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_21_chase
+    start: 21.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_21
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: reverse
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_22_breath
+    start: 21.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_22
+    origin: start
+    effect:
+      mode: fixed
+      id: breath
+      params:
+        period: 3
+        min_brightness: 0.05
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 2.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p2_31_chase
+    start: 21.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_31
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: forward
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_41_chase
+    start: 21.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_41
+    origin: start
+    effect:
+      mode: fixed
+      id: chase
+      params:
+        speed: 10
+        width: 10
+        gap: 30
+        direction: reverse
+        trail: 1
+        color_source: static
+        beat_boost: 1
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_42_comet
+    start: 21.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: comet
+      params:
+        speed: 30
+        tail_length: 0.25
+        decay: 0.85
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_32_breath
+    start: 21.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_32
+    origin: start
+    effect:
+      mode: fixed
+      id: breath
+      params:
+        period: 3
+        min_brightness: 0.05
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 2.0
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_43_comet
+    start: 21.5
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: comet
+      params:
+        speed: 30
+        tail_length: 0.25
+        decay: 0.85
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_93_comet
+    start: 22.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: comet
+      params:
+        speed: 30
+        tail_length: 0.25
+        decay: 0.85
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_44_comet
+    start: 22.5
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_44
+    origin: start
+    effect:
+      mode: fixed
+      id: comet
+      params:
+        speed: 30
+        tail_length: 0.25
+        decay: 0.85
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p2_45_comet
+    start: 23.0
+    end: 41.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_44
+    origin: start
+    effect:
+      mode: fixed
+      id: comet
+      params:
+        speed: 30
+        tail_length: 0.25
+        decay: 0.85
+    color:
+      mode: solid
+      color:
+      - 0.06
+      - 0.06
+      - 0.1
+    transition:
+      fade_in: 0.5
+      fade_out: 0.0
+      blend: replace
+  - id: phase2_p3_11_chase_center
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_11
+    origin: center
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 30
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_12_breath
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_12
+    origin: start
+    effect:
+      mode: fixed
+      id: breath
+      params:
+        period: 5
+        min_brightness: 0.1
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 2.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_21_chase_center
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_21
+    origin: center
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 30
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_42_wipe
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_43_wipe
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.4
+      blend: replace
+  - id: phase2_p3_44_wipe
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_44
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_45_wipe
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_44
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.3
+      blend: replace
+  - id: phase2_p3_93_wipe
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_43
+    origin: start
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.2
+      blend: replace
+  - id: phase2_p3_32_ambient
+    start: 41.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_32
+    origin: start
     effect:
       mode: fixed
       id: static
       params: {}
     color:
       mode: solid
-      color: [1.0, 0.3921568627, 0.4705882353]
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
     transition:
-      fade_in: 4.0
-      fade_out: 0.0
+      fade_in: 1.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_31_chase_ends
+    start: 44.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_31
+    origin: edges
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.0
+      blend: replace
+  - id: phase2_p3_41_chase_ends
+    start: 44.0
+    end: 53.0
+    priority: 10
+    target:
+      type: digital_strip
+      id: strip_41
+    origin: edges
+    effect:
+      mode: fixed
+      id: color_wipe
+      params:
+        speed: 10
+    color:
+      mode: solid
+      color:
+      - 0.39
+      - 0.39
+      - 0.51
+    transition:
+      fade_in: 1.0
+      fade_out: 1.0
       blend: replace
