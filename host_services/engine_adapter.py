@@ -1146,36 +1146,39 @@ _ensure_mpv_at_startup()
 # ══════════════════════════════════════════════
 
 def _deferred_re_resolve() -> None:
-    """开机 30 秒后再 resolve 一次；如果 IP 变了就热更新 _devices。
+    """开机后退避重试 resolve，直到九块全部解析出真实 IP 或耗尽重试。
 
-    解决开机时节点还没连上 WiFi、avahi 还没 ready 的时序问题。
+    覆盖冷启动时节点还没连 WiFi / avahi 还没 ready 的时序缝隙。
+    单次 30s 对慢冷启动不够，改为退避重试；任一次全部解析成功即停止。
     """
     global _valid_target_ids, _capability_targets, _devices
     if ENGINE_ADAPTER != "real":
         return
-    time.sleep(30)
-    try:
-        old_hosts = {d["device_id"]: d.get("host") for d in _devices}
-        _run_resolve_nodes()
-        from light_engine.config import Config as _Cfg
-        _Cfg.reset()  # 清掉 singleton 缓存，强制重新读文件
-        new_ids, new_caps, new_devs = _load_layout_vocab()
-        new_hosts = {d["device_id"]: d.get("host") for d in new_devs}
-        changed = {k for k in old_hosts if old_hosts[k] != new_hosts.get(k)}
-        if changed:
-            _valid_target_ids = new_ids
-            _capability_targets = new_caps
-            _devices = new_devs
-            _log.info(
-                "deferred re-resolve: updated %d device IPs: %s",
-                len(changed),
-                ", ".join(f"{k}: {old_hosts[k]} -> {new_hosts.get(k)}" for k in changed),
-            )
-        else:
-            _log.info("deferred re-resolve: all IPs unchanged")
-    except Exception as exc:
-        _log.warning("deferred re-resolve failed: %s", exc)
-
-
-if ENGINE_ADAPTER == "real":
-    threading.Thread(target=_deferred_re_resolve, name="deferred-re-resolve", daemon=True).start()
+    from light_engine.config import Config as _Cfg
+    for attempt, delay in enumerate((15, 15, 30, 30, 60, 60, 120), start=1):
+        time.sleep(delay)
+        try:
+            old_hosts = {d["device_id"]: d.get("host") for d in _devices}
+            _run_resolve_nodes()
+            _Cfg.reset()  # 清掉 singleton 缓存，强制重新读文件
+            new_ids, new_caps, new_devs = _load_layout_vocab()
+            new_hosts = {d["device_id"]: d.get("host") for d in new_devs}
+            changed = {k for k in old_hosts if old_hosts[k] != new_hosts.get(k)}
+            if changed:
+                _valid_target_ids = new_ids
+                _capability_targets = new_caps
+                _devices = new_devs
+                _log.info(
+                    "deferred re-resolve #%d: updated %s",
+                    attempt,
+                    ", ".join(f"{k}: {old_hosts[k]} -> {new_hosts.get(k)}" for k in changed),
+                )
+            unresolved = [k for k, v in new_hosts.items()
+                          if not v or str(v).endswith(".local")]
+            if not unresolved:
+                _log.info("deferred re-resolve #%d: 九块全部解析成功，停止", attempt)
+                return
+            _log.info("deferred re-resolve #%d: 仍未解析 %s", attempt, unresolved)
+        except Exception as exc:
+            _log.warning("deferred re-resolve #%d failed: %s", attempt, exc)
+    _log.warning("deferred re-resolve: 重试耗尽，仍有节点未解析")
