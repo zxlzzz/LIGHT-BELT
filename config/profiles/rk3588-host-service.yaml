@@ -23,33 +23,33 @@ layout:
     - {id: strip_32, type: digital, pixel_count: 40, video_zone: left, direction: forward}
     - {id: strip_31, type: digital, pixel_count: 10, video_zone: left, direction: forward}
     - {id: strip_41, type: digital, pixel_count: 10, video_zone: right, direction: forward}
-    - {id: strip_43, type: digital, pixel_count: 20, video_zone: right, direction: forward}
-    - {id: strip_44, type: digital, pixel_count: 20, video_zone: right, direction: forward}
-    - {id: strip_11, type: digital, pixel_count: 10, video_zone: top, direction: forward}
-    - {id: strip_12, type: digital, pixel_count: 40, video_zone: top, direction: forward}
-    - {id: strip_21, type: digital, pixel_count: 10, video_zone: bottom, direction: forward}
-    - {id: strip_22, type: digital, pixel_count: 40, video_zone: bottom, direction: forward}
+    - {id: strip_43, type: digital, pixel_count: 40, video_zone: right, direction: forward}
+    - {id: strip_44, type: digital, pixel_count: 40, video_zone: right, direction: forward}
+    - {id: strip_11, type: digital, pixel_count: 30, video_zone: top, direction: forward}
+    - {id: strip_12, type: digital, pixel_count: 160, video_zone: top, direction: forward}
+    - {id: strip_21, type: digital, pixel_count: 30, video_zone: bottom, direction: forward}
+    - {id: strip_22, type: digital, pixel_count: 160, video_zone: bottom, direction: forward}
   digital_nodes:
     - {node_id: 1, host: wled-strip-32.local, port: 4048, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
     - {node_id: 2, host: wled-strip-41.local, port: 4048, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 3, host: wled-strip-44.local, port: 4048, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 4, host: wled-strip-12.local, port: 4048, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 5, host: wled-strip-22.local, port: 4048, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 3, host: wled-strip-44.local, port: 4048, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 4, host: wled-strip-12.local, port: 4048, pixel_count: 160, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 5, host: wled-strip-22.local, port: 4048, pixel_count: 160, max_udp_payload: 1400, protocol_version: 3}
     - {node_id: 6, host: wled-strip-31.local, port: 4048, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 7, host: wled-strip-43.local, port: 4048, pixel_count: 20, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 8, host: wled-strip-11.local, port: 4048, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
-    - {node_id: 9, host: wled-strip-21.local, port: 4048, pixel_count: 10, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 7, host: wled-strip-43.local, port: 4048, pixel_count: 40, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 8, host: wled-strip-11.local, port: 4048, pixel_count: 30, max_udp_payload: 1400, protocol_version: 3}
+    - {node_id: 9, host: wled-strip-21.local, port: 4048, pixel_count: 30, max_udp_payload: 1400, protocol_version: 3}
   digital_segments: []
   digital_outputs:
     - {node_id: 1, output_id: 1, gpio: 16, strip_id: strip_32, pixel_count: 40, direction: forward}
     - {node_id: 2, output_id: 1, gpio: 16, strip_id: strip_41, pixel_count: 10, direction: forward}
-    - {node_id: 3, output_id: 1, gpio: 16, strip_id: strip_44, pixel_count: 20, direction: forward}
-    - {node_id: 4, output_id: 1, gpio: 16, strip_id: strip_12, pixel_count: 40, direction: forward}
-    - {node_id: 5, output_id: 1, gpio: 16, strip_id: strip_22, pixel_count: 40, direction: forward}
+    - {node_id: 3, output_id: 1, gpio: 16, strip_id: strip_44, pixel_count: 40, direction: forward}
+    - {node_id: 4, output_id: 1, gpio: 16, strip_id: strip_12, pixel_count: 160, direction: forward}
+    - {node_id: 5, output_id: 1, gpio: 16, strip_id: strip_22, pixel_count: 160, direction: forward}
     - {node_id: 6, output_id: 1, gpio: 16, strip_id: strip_31, pixel_count: 10, direction: forward}
-    - {node_id: 7, output_id: 1, gpio: 16, strip_id: strip_43, pixel_count: 20, direction: forward}
-    - {node_id: 8, output_id: 1, gpio: 16, strip_id: strip_11, pixel_count: 10, direction: forward}
-    - {node_id: 9, output_id: 1, gpio: 16, strip_id: strip_21, pixel_count: 10, direction: forward}
+    - {node_id: 7, output_id: 1, gpio: 16, strip_id: strip_43, pixel_count: 40, direction: forward}
+    - {node_id: 8, output_id: 1, gpio: 16, strip_id: strip_11, pixel_count: 30, direction: forward}
+    - {node_id: 9, output_id: 1, gpio: 16, strip_id: strip_21, pixel_count: 30, direction: forward}
   virtual_paths: []
   video_zone_map:
     left: [strip_32, strip_31]
