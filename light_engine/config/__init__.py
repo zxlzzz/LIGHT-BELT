@@ -637,7 +637,7 @@ def validate_config(data: dict[str, Any]) -> None:
                 raise ConfigError(path, "strip_id", strip_id, "existing layout.strips id")
             if pixel_count != strip_lengths[strip_id]:
                 raise ConfigError(path, "pixel_count", pixel_count, f"exact logical strip {strip_id!r} length {strip_lengths[strip_id]}")
-            if pixel_count > 100:
+            if pixel_count > 200:
                 raise ConfigError(path, "pixel_count", pixel_count, "<= 100 per physical output")
             if strip_id in seen_strips:
                 raise ConfigError(path, "strip_id", strip_id, "unique complete strip mapping")

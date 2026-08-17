@@ -80,7 +80,7 @@ class UdpV3Output:
         if self.output_id == 0:
             raise ValueError("output_id must be non-zero")
         _require_uint("gpio", self.gpio, MAX_UINT8)
-        if len(self.pixels) > 100:
+        if len(self.pixels) > 300:
             raise ValueError("one ESP32 output may contain at most 100 pixels")
         if len(self.pixels) > MAX_UINT16:
             raise ValueError("pixel count must fit uint16")
@@ -206,7 +206,7 @@ class UdpV3Packet:
             cursor += OUTPUT_LENGTH
             if output_id == 0 or output_id in seen_ids or gpio in seen_gpios:
                 return None
-            if pixel_count > 100 or output_length != pixel_count * 3:
+            if pixel_count > 300 or output_length != pixel_count * 3:
                 return None
             if cursor + output_length > payload_end:
                 return None
