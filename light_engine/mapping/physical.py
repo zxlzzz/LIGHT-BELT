@@ -278,7 +278,7 @@ class PhysicalMapping:
                 raise ValueError(
                     f"{locator}: pixel_count must equal logical strip {output.strip_id!r} length"
                 )
-            if output.pixel_count > 100:
+            if output.pixel_count > 300:
                 raise ValueError(f"{locator}: pixel_count must be <= 100 for an ESP32 output")
             try:
                 validate_direction(output.direction, output.strip_id)
