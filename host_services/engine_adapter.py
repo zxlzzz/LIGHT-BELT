@@ -608,7 +608,7 @@ def playback_play(show_id: str, start_ms: float | None) -> tuple[dict | None, st
     if start_ms is not None and start_ms > show["duration_ms"]:
         return None, "INVALID_ARGUMENT"
     # Tear down current playback before starting new show (same as stop).
-    if _mpv:
+    if _mpv and not show.get("media_path"):
         _mpv.stop()
     _manual_targets.clear()
     if _real_adapter is not None:
@@ -1182,3 +1182,34 @@ def _deferred_re_resolve() -> None:
         except Exception as exc:
             _log.warning("deferred re-resolve #%d failed: %s", attempt, exc)
     _log.warning("deferred re-resolve: 重试耗尽，仍有节点未解析")
+    
+
+_deferred_re_resolve_thread: threading.Thread | None = None
+
+
+def _start_deferred_re_resolve() -> None:
+    global _deferred_re_resolve_thread
+    if ENGINE_ADAPTER != "real":
+        return
+    if _deferred_re_resolve_thread is not None and _deferred_re_resolve_thread.is_alive():
+        return
+    _deferred_re_resolve_thread = threading.Thread(
+        target=_deferred_re_resolve, name="deferred-re-resolve", daemon=True)
+    _deferred_re_resolve_thread.start()
+    _log.info("engine_adapter: deferred re-resolve thread started")
+
+
+_start_deferred_re_resolve()
+
+def _start_deferred_re_resolve() -> None:
+    """后台启动退避重试线程，补冷启动时节点未就绪的时序缝隙。
+
+    _deferred_re_resolve 内部已对 ENGINE_ADAPTER != "real" 做了早退，
+    这里始终尝试启动，避免遗漏。
+    """
+    threading.Thread(
+        target=_deferred_re_resolve, name="deferred-re-resolve", daemon=True).start()
+    _log.info("engine_adapter: deferred re-resolve thread started")
+
+
+_start_deferred_re_resolve()
