@@ -49,6 +49,14 @@ async def _disable_dpms():
             pass
 
 
+@app.on_event("startup")
+async def _initialize_wled_black_boot_policy():
+    """Persist black cold-boot defaults and leave every reachable WLED off."""
+    from . import engine_adapter
+
+    engine_adapter.initialize_wled_safe_state(force_off=True)
+
+
 @app.exception_handler(RequestValidationError)
 async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     from .response import error as _error

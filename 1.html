@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>WLED 控制台</title>
+<style>
+  :root {
+    --bg: #0e0e12;
+    --surface: #1a1a22;
+    --surface2: #24242e;
+    --border: #2e2e3a;
+    --text: #e0e0e8;
+    --text2: #8888a0;
+    --accent: #f0a030;
+    --green: #40c060;
+    --red: #e04040;
+    --blue: #4090e0;
+    --r: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height:100vh; padding:12px; padding-bottom:60px;
+  }
+  h1 { font-size:20px; font-weight:600; text-align:center; padding:10px 0 4px; color:var(--accent); }
+  h1 span { font-size:11px; color:var(--text2); display:block; margin-top:2px; }
+
+  .tabs { display:flex; gap:0; margin-bottom:12px; border-bottom:2px solid var(--border); }
+  .tab {
+    flex:1; text-align:center; padding:10px 0; font-size:14px; font-weight:500;
+    color:var(--text2); cursor:pointer; border-bottom:2px solid transparent;
+    margin-bottom:-2px;
+  }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .page { display:none; }
+  .page.active { display:block; }
+
+  .scan-bar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .scan-bar input {
+    flex:1; min-width:100px; padding:10px 12px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    color:var(--text); font-size:14px; outline:none;
+  }
+  .scan-bar input:focus { border-color:var(--accent); }
+  .btn {
+    padding:10px 16px; border:none; border-radius:var(--r);
+    font-size:14px; font-weight:500; cursor:pointer; white-space:nowrap;
+  }
+  .btn:active { opacity:.7; }
+  .btn-accent { background:var(--accent); color:#000; }
+  .btn-secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .btn:disabled { opacity:.4; }
+
+  .status-bar { font-size:12px; color:var(--text2); margin-bottom:8px; min-height:16px; }
+  .progress-bar { height:3px; background:var(--surface2); border-radius:2px; margin-bottom:8px; overflow:hidden; display:none; }
+  .progress-bar.active { display:block; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .2s; }
+
+  .node-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .node-header label { font-size:13px; color:var(--text2); display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .node-count { font-size:12px; color:var(--text2); }
+  .node-list { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+
+  .node-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    padding:10px 12px; display:flex; align-items:center; gap:8px;
+  }
+  .node-card.selected { border-color:var(--accent); }
+  .node-card.offline { opacity:.45; }
+  .node-check { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; }
+  .node-info { flex:1; min-width:0; }
+  .node-name { font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .node-detail { font-size:11px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; display:inline-block; }
+  .dot.on { background:var(--green); }
+  .dot.off { background:var(--red); }
+  .dot.unknown { background:var(--text2); }
+  .node-actions { display:flex; gap:4px; flex-shrink:0; }
+  .node-link {
+    font-size:11px; color:var(--blue); text-decoration:none; padding:4px 7px;
+    background:var(--surface2); border-radius:6px;
+  }
+  .node-remove { font-size:14px; color:var(--text2); background:none; border:none; cursor:pointer; padding:4px 5px; }
+
+  .empty { text-align:center; padding:30px 20px; color:var(--text2); font-size:14px; }
+
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:10px; }
+  .panel-title { font-size:13px; font-weight:600; margin-bottom:10px; color:var(--accent); }
+  .power-row { display:flex; gap:8px; margin-bottom:12px; }
+  .btn-power { flex:1; padding:12px; font-size:15px; font-weight:600; border-radius:var(--r); border:none; cursor:pointer; }
+  .btn-on { background:var(--green); color:#fff; }
+  .btn-off { background:var(--red); color:#fff; }
+  .safe-power {
+    display:flex; align-items:flex-start; gap:9px; padding:10px 11px; margin-bottom:10px;
+    background:#14251a; border:1px solid #2d6b3d; border-radius:8px;
+    color:#b8dfc1; font-size:12px; line-height:1.5; cursor:pointer;
+  }
+  .safe-power input { width:18px; height:18px; margin-top:1px; accent-color:var(--green); flex-shrink:0; }
+  .power-note { font-size:11px; color:var(--text2); line-height:1.55; }
+  .power-result { min-height:18px; margin-top:8px; font-size:12px; color:var(--text2); }
+  .power-result.ok { color:var(--green); }
+  .power-result.fail { color:#f08080; }
+
+  .ctrl-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .ctrl-lbl { font-size:12px; color:var(--text2); width:40px; flex-shrink:0; }
+  .ctrl-body { flex:1; display:flex; align-items:center; gap:8px; }
+  input[type="range"] {
+    flex:1; height:6px; -webkit-appearance:none; appearance:none;
+    background:var(--surface2); border-radius:3px; outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--accent); cursor:pointer;
+  }
+  .rval { font-size:13px; color:var(--text); width:30px; text-align:right; flex-shrink:0; }
+  input[type="color"] {
+    width:44px; height:36px; border:1px solid var(--border); border-radius:6px;
+    background:var(--surface2); cursor:pointer; padding:2px;
+  }
+  .color-hex { font-size:12px; color:var(--text2); font-family:monospace; }
+  .color-actions { display:flex; gap:6px; margin-left:auto; }
+  .color-actions .btn { padding:8px 11px; font-size:12px; }
+
+  .fx-search {
+    width:100%; padding:10px 12px; margin-bottom:8px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+    color:var(--text); font-size:14px; outline:none;
+  }
+  .fx-search:focus { border-color:var(--accent); }
+  .fx-search::placeholder { color:var(--text2); }
+
+  .fx-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:6px;
+    max-height:55vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .fx-item {
+    padding:10px 8px; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; font-size:12px; cursor:pointer; text-align:center;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  }
+  .fx-item:active { background:var(--accent); color:#000; }
+  .fx-item.active { border-color:var(--accent); background:var(--surface2); color:var(--accent); }
+  .fx-item .fx-id { font-size:10px; color:var(--text2); }
+  .fx-item.active .fx-id { color:var(--accent); }
+
+  .pal-grid {
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px;
+    max-height:55vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .pal-item {
+    padding:8px 6px; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; font-size:11px; cursor:pointer; text-align:center;
+    overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+  }
+  .pal-item:active { background:var(--accent); color:#000; }
+  .pal-item.active { border-color:var(--accent); color:var(--accent); }
+
+  .sel-info { font-size:12px; color:var(--text2); margin-bottom:8px; text-align:center; }
+
+  /* ===== WiFi tab ===== */
+  .wf-warn {
+    background:#2a1e10; border:1px solid var(--accent); border-radius:var(--r);
+    padding:12px 14px; margin-bottom:14px; font-size:12px; color:#e8c890; line-height:1.7;
+  }
+  .wf-warn b { color:var(--accent); }
+  .wf-warn .no { color:var(--green); }
+  .wf-field { margin-bottom:10px; }
+  .wf-field label { display:block; font-size:12px; color:var(--text2); margin-bottom:5px; }
+  .wf-input {
+    width:100%; padding:12px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--r); color:var(--text); font-size:15px; outline:none; font-family:inherit;
+  }
+  .wf-input:focus { border-color:var(--accent); }
+  .btn-push {
+    width:100%; padding:14px; font-size:16px; font-weight:600; border:none;
+    border-radius:var(--r); background:var(--accent); color:#000; cursor:pointer; margin-top:4px;
+  }
+  .btn-push:disabled { opacity:.4; }
+  .wf-results { margin-top:14px; display:flex; flex-direction:column; gap:5px; }
+  .wf-line {
+    font-size:12px; padding:9px 11px; background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; word-break:break-all; line-height:1.5;
+  }
+  .wf-line.wf-done { border-color:var(--green); }
+  .wf-line.wf-skip { border-color:var(--red); color:#e69090; }
+
+  .toast {
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--surface2); border:1px solid var(--border); border-radius:var(--r);
+    padding:10px 20px; font-size:13px; color:var(--text); z-index:100;
+    opacity:0; transition:opacity .3s; pointer-events:none;
+  }
+  .toast.show { opacity:1; }
+
+  .debug-log {
+    margin-top:12px; padding:10px; background:#111; border:1px solid var(--border);
+    border-radius:var(--r); font-family:monospace; font-size:11px; color:#aaa;
+    max-height:200px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;
+    display:none;
+  }
+  .debug-log.show { display:block; }
+
+  @media(max-width:420px){
+    body{padding:8px;padding-bottom:60px;}
+    .scan-bar{flex-direction:column;}
+    .tab{font-size:13px;}
+  }
+</style>
+</head>
+<body>
+
+<h1>WLED 控制台<span>多节点批量控制 · 点选即生效</span></h1>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('nodes')">节点</div>
+  <div class="tab" onclick="switchTab('effects')">灯效</div>
+  <div class="tab" onclick="switchTab('palette')">调色板</div>
+  <div class="tab" onclick="switchTab('adjust')">调节</div>
+  <div class="tab" onclick="switchTab('wifi')">WiFi</div>
+</div>
+
+<!-- ===== 节点 ===== -->
+<div class="page active" id="page-nodes">
+  <div class="scan-bar">
+    <input type="text" id="subnet" value="192.168.31" placeholder="子网前缀">
+    <button class="btn btn-accent" id="btnScan" onclick="scanSubnet()">扫描</button>
+    <input type="text" id="manualIp" placeholder="添加 IP">
+    <button class="btn btn-secondary" onclick="addManual()">添加</button>
+    <button class="btn btn-secondary" onclick="addDirectWled()">直连 4.3.2.1</button>
+  </div>
+  <div class="status-bar" id="statusBar"></div>
+  <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="node-header">
+    <label><input type="checkbox" class="node-check" id="selectAll" onchange="toggleSelectAll()"> 全选</label>
+    <div>
+      <span class="node-count" id="nodeCount"></span>
+      <button class="btn btn-secondary" style="padding:4px 10px;font-size:11px;margin-left:6px" onclick="toggleDebug()">日志</button>
+    </div>
+  </div>
+  <div class="node-list" id="nodeList">
+    <div class="empty" id="emptyMsg">还没有节点 — 点「扫描」或手动添加 IP</div>
+  </div>
+
+  <div class="panel" id="powerPanel" style="display:none">
+    <div class="panel-title">灯光总开关</div>
+    <div class="safe-power">
+      <span><b>黑场安全策略已强制启用</b><br>开启和关闭都会把 WLED 本地回退态清成 Solid 黑场，不再提供可能露出默认琥珀色的普通开启。</span>
+    </div>
+    <div class="power-row">
+      <button class="btn btn-power btn-on" id="btnPowerOn" onclick="batchPower(true)">安全激活所选</button>
+      <button class="btn btn-power btn-off" id="btnPowerOff" onclick="batchPower(false)">关闭所选</button>
+    </div>
+    <button class="btn btn-secondary" id="btnBootBlack" style="width:100%;margin-top:8px" onclick="batchBootBlack()">固化所选节点的上电黑场</button>
+    <div class="power-note" id="powerHint">每块板第一次连接时先固化上电黑场；安全激活后保持黑场，再由「灯效」「调节」或 DDP 下发真正内容。</div>
+    <div class="power-result" id="powerResult"></div>
+  </div>
+  <div class="debug-log" id="debugLog"></div>
+</div>
+
+<!-- ===== 灯效 ===== -->
+<div class="page" id="page-effects">
+  <div class="sel-info" id="fxSelInfo"></div>
+  <input type="text" class="fx-search" id="fxSearch" placeholder="搜索效果名..." oninput="renderEffects()">
+  <div class="fx-grid" id="fxGrid"></div>
+</div>
+
+<!-- ===== 调色板 ===== -->
+<div class="page" id="page-palette">
+  <div class="sel-info" id="palSelInfo"></div>
+  <input type="text" class="fx-search" id="palSearch" placeholder="搜索调色板..." oninput="renderPalettes()">
+  <div class="pal-grid" id="palGrid"></div>
+</div>
+
+<!-- ===== 调节 ===== -->
+<div class="page" id="page-adjust">
+  <div class="sel-info" id="adjSelInfo"></div>
+
+  <div class="panel">
+    <div class="panel-title">亮度</div>
+    <div class="ctrl-row">
+      <div class="ctrl-body">
+        <input type="range" id="sliderBri" min="0" max="255" value="128"
+          oninput="document.getElementById('valBri').textContent=this.value"
+          onchange="sendParam('A='+this.value)">
+        <span class="rval" id="valBri">128</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">颜色 <span style="font-weight:400;font-size:11px;color:var(--text2)">（自动切 Solid）</span></div>
+    <div class="ctrl-row">
+      <div class="ctrl-body">
+        <input type="color" id="pickColor" value="#000000" onchange="sendColor()">
+        <span class="color-hex" id="hexColor">#000000</span>
+        <div class="color-actions">
+          <button class="btn btn-secondary" onclick="setBlack()">黑场</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">效果速度</div>
+    <div class="ctrl-row">
+      <div class="ctrl-body">
+        <input type="range" id="sliderSpeed" min="0" max="255" value="128"
+          oninput="document.getElementById('valSpeed').textContent=this.value"
+          onchange="sendParam('SX='+this.value)">
+        <span class="rval" id="valSpeed">128</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">效果强度</div>
+    <div class="ctrl-row">
+      <div class="ctrl-body">
+        <input type="range" id="sliderIntensity" min="0" max="255" value="128"
+          oninput="document.getElementById('valIntensity').textContent=this.value"
+          onchange="sendParam('IX='+this.value)">
+        <span class="rval" id="valIntensity">128</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== WiFi ===== -->
+<div class="page" id="page-wifi">
+  <div class="sel-info" id="wfSelInfo"></div>
+
+  <div class="wf-warn">
+    <b>批量改 WiFi 前必看：</b><br>
+    ① <b>先把要连的新 WiFi / 板子 AP 起好并确认能连</b>，再推。<br>
+    ② 推送后节点会<b>离开当前网络</b>去连新 WiFi，<b>不会自动回到这里</b>——这是正常的，去新网络重新扫描验证。<br>
+    ③ 只会推给<b>能读到当前配置</b>的节点；读不到的自动跳过、不动它（防止把热点/主机名冲掉）。<br>
+    ④ 会自动保留每块板的 AP 热点、主机名、禁用休眠、发射功率等设置，只改要连的 WiFi。<br>
+    ⑤ <span class="no">不需要断电重启</span>，板子会自己软重连。
+  </div>
+
+  <div class="wf-field">
+    <label>新 WiFi 名称 (SSID)</label>
+    <input type="text" class="wf-input" id="wfSsid" placeholder="例如 板子AP 的 SSID" autocomplete="off">
+  </div>
+  <div class="wf-field">
+    <label>新 WiFi 密码（明文可见，方便核对；留空=开放网络）</label>
+    <input type="text" class="wf-input" id="wfPass" placeholder="至少 8 位" autocomplete="off">
+  </div>
+
+  <button class="btn-push" id="btnPushWifi" onclick="pushWifi()">批量推送到选中节点</button>
+
+  <div class="wf-results" id="wfResults"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TIMEOUT = 2000;
+const DIRECT_WLED_IP = '4.3.2.1';
+// WLED applies color/effect before the T toggle, then commits the state once.
+const SAFE_POWER_ON = 'T=1&TT=0&FX=0&R=0&G=0&B=0&W=0';
+const POWER_OFF = 'T=0&TT=0&FX=0&R=0&G=0&B=0&W=0';
+let nodes = {};
+let effects = null;
+let palettes = null;
+let scanning = false;
+let activeFx = -1;
+let activePal = -1;
+
+// ===== Debug =====
+const dbg = { el: null };
+function log(msg) {
+  if (!dbg.el) dbg.el = document.getElementById('debugLog');
+  const ts = new Date().toLocaleTimeString();
+  dbg.el.textContent += `[${ts}] ${msg}\n`;
+  dbg.el.scrollTop = dbg.el.scrollHeight;
+}
+function toggleDebug() {
+  const el = document.getElementById('debugLog');
+  el.classList.toggle('show');
+}
+
+// ===== Tabs =====
+function switchTab(name) {
+  const pages = ['nodes','effects','palette','adjust','wifi'];
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const active = pages[i] === name;
+    t.classList.toggle('active', active);
+    document.getElementById('page-' + pages[i]).classList.toggle('active', active);
+  });
+  if (name === 'effects') { updateSelInfo('fxSelInfo'); renderEffects(); }
+  if (name === 'palette') { updateSelInfo('palSelInfo'); renderPalettes(); }
+  if (name === 'adjust') updateSelInfo('adjSelInfo');
+  if (name === 'wifi') updateSelInfo('wfSelInfo');
+}
+function updateSelInfo(id) {
+  const sel = getSelected();
+  document.getElementById(id).textContent = sel.length === 0
+    ? '⚠ 请先在「节点」页勾选要控制的灯带'
+    : `已选 ${sel.length} 个节点 — 点选即生效`;
+}
+
+// ===== Persistence =====
+function saveNodes() {
+  try { localStorage.setItem('wled_nodes', JSON.stringify(Object.keys(nodes))); } catch(e){}
+}
+function loadNodes() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('wled_nodes') || '[]');
+    if (saved.length) saved.forEach(ip => probeNode(ip));
+  } catch(e){}
+}
+
+// ===== Toast =====
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+function setStatus(msg) { document.getElementById('statusBar').textContent = msg; }
+function setProgress(pct) {
+  const bar = document.getElementById('progressBar');
+  const fill = document.getElementById('progressFill');
+  if (pct < 0) { bar.classList.remove('active'); return; }
+  bar.classList.add('active'); fill.style.width = pct + '%';
+}
+
+// ===== Fetch helpers =====
+async function fetchTimeout(url, timeout) {
+  const ac = new AbortController();
+  const tm = setTimeout(() => ac.abort(), timeout || TIMEOUT);
+  try {
+    const r = await fetch(url, { signal: ac.signal });
+    clearTimeout(tm); return r;
+  } catch(e) { clearTimeout(tm); return null; }
+}
+
+// ===== WLED /win API (legacy HTTP, simple GET) =====
+// /win&T=1     → on
+// /win&T=0     → off
+// /win&A=128   → brightness
+// /win&FX=12   → effect
+// /win&SX=128  → speed
+// /win&IX=200  → intensity
+// /win&FP=5    → palette
+// /win&R=255&G=0&B=0  → color
+// /win&FX=0    → Solid effect
+async function winCmd(ip, params) {
+  const url = `http://${ip}/win&${params}`;
+  log(`→ ${url}`);
+  const r = await fetchTimeout(url, TIMEOUT);
+  if (r && r.ok) {
+    log(`✓ ${ip} OK`);
+    return true;
+  } else {
+    log(`✗ ${ip} FAIL (${r ? r.status : 'timeout'})`);
+    return false;
+  }
+}
+
+async function postJson(ip, path, payload) {
+  const ac = new AbortController();
+  const tm = setTimeout(() => ac.abort(), TIMEOUT);
+  try {
+    const r = await fetch(`http://${ip}${path}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+      signal: ac.signal,
+    });
+    clearTimeout(tm);
+    return Boolean(r && r.ok);
+  } catch(e) {
+    clearTimeout(tm);
+    log(`✗ ${ip}${path} FAIL (${e.name || e})`);
+    return false;
+  }
+}
+
+// ===== Probe (still uses /json for info) =====
+async function probeNode(ip) {
+  const r = await fetchTimeout(`http://${ip}/json`, TIMEOUT);
+  if (!r || !r.ok) {
+    if (nodes[ip]) { nodes[ip].online = false; renderNodes(); }
+    return null;
+  }
+  try {
+    const d = await r.json();
+    const info = d.info || {};
+    const st = d.state || {};
+    const seg = (st.seg && st.seg[0]) || {};
+    nodes[ip] = {
+      ip, name: info.name || ip, ver: info.ver || '?',
+      online: true, on: st.on || false, bri: st.bri || 0,
+      fx: seg.fx ?? -1, pal: seg.pal ?? -1,
+      _sel: nodes[ip] ? nodes[ip]._sel : false,
+    };
+    saveNodes(); renderNodes();
+    if (!effects) loadFxPal(ip);
+    return nodes[ip];
+  } catch(e) { return null; }
+}
+
+async function loadFxPal(ip) {
+  try {
+    const [er, pr] = await Promise.all([
+      fetchTimeout(`http://${ip}/json/effects`, TIMEOUT),
+      fetchTimeout(`http://${ip}/json/palettes`, TIMEOUT)
+    ]);
+    if (er && er.ok) effects = await er.json();
+    if (pr && pr.ok) palettes = await pr.json();
+    log(`效果列表 ${effects ? effects.length : 0} 个, 调色板 ${palettes ? palettes.length : 0} 个`);
+  } catch(e) { log('loadFxPal error: ' + e); }
+}
+
+// ===== Scan =====
+async function scanSubnet() {
+  if (scanning) return;
+  const pfx = document.getElementById('subnet').value.trim();
+  if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(pfx)) { toast('格式: x.x.x'); return; }
+  scanning = true;
+  document.getElementById('btnScan').disabled = true;
+  let found = 0, done = 0;
+  setStatus(`扫描 ${pfx}.1-254...`); setProgress(0);
+  log(`开始扫描 ${pfx}.1-254`);
+  // WLED AP / embedded Wi-Fi can be overwhelmed by a large burst of probes.
+  const batch = 4;
+  for (let s = 1; s <= 254; s += batch) {
+    const ps = [];
+    for (let i = s; i < s + batch && i <= 254; i++) {
+      ps.push(probeNode(`${pfx}.${i}`).then(n => { if(n) found++; done++; }));
+    }
+    await Promise.all(ps);
+    setProgress(Math.round(done/254*100));
+    setStatus(`扫描中 ${done}/254，发现 ${found} 个`);
+  }
+  setProgress(-1);
+  setStatus(`完成，共 ${found} 个 WLED 节点`);
+  log(`扫描完成: ${found} 个节点`);
+  scanning = false;
+  document.getElementById('btnScan').disabled = false;
+}
+
+function addManual() {
+  const inp = document.getElementById('manualIp');
+  let ip = inp.value.trim(); if (!ip) return;
+  if (/^\d{1,3}$/.test(ip)) ip = document.getElementById('subnet').value.trim() + '.' + ip;
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) { toast('IP 格式不对'); return; }
+  probeNode(ip).then(n => {
+    if (n) {
+      n._sel = true;
+      renderNodes();
+      toast(`已添加并选中 ${n.name}`);
+    } else {
+      toast(`${ip} 无响应`);
+    }
+  });
+  inp.value = '';
+}
+
+function addDirectWled() {
+  document.getElementById('manualIp').value = DIRECT_WLED_IP;
+  setStatus(`正在连接 WLED 直连地址 ${DIRECT_WLED_IP}...`);
+  addManual();
+}
+
+// ===== Render Nodes =====
+function renderNodes() {
+  const list = document.getElementById('nodeList');
+  const ips = Object.keys(nodes).sort((a,b) => {
+    const na=a.split('.').map(Number), nb=b.split('.').map(Number);
+    for(let i=0;i<4;i++) if(na[i]!==nb[i]) return na[i]-nb[i];
+    return 0;
+  });
+  const onN = ips.filter(ip => nodes[ip].online).length;
+  document.getElementById('nodeCount').textContent = `${onN} 在线 / ${ips.length} 总`;
+  document.getElementById('emptyMsg').style.display = ips.length ? 'none' : 'block';
+  document.getElementById('powerPanel').style.display = ips.length ? 'block' : 'none';
+
+  list.querySelectorAll('.node-card').forEach(el => el.remove());
+  ips.forEach(ip => {
+    const n = nodes[ip];
+    const fxName = (effects && n.fx >= 0 && n.fx < effects.length) ? effects[n.fx] : '';
+    const card = document.createElement('div');
+    card.className = 'node-card' + (n.online?'':' offline') + (n._sel?' selected':'');
+    card.innerHTML = `
+      <input type="checkbox" class="node-check" ${n._sel?'checked':''} onchange="toggleNode('${ip}',this.checked)">
+      <div class="node-info">
+        <div class="node-name">${esc(n.name)}</div>
+        <div class="node-detail">
+          <span class="dot ${n.online?(n.on?'on':'off'):'unknown'}"></span>
+          ${ip} · ${n.online?(n.on?'亮度'+n.bri:'OFF'):'离线'}${fxName?' · '+esc(fxName):''}
+        </div>
+      </div>
+      <div class="node-actions">
+        <a class="node-link" href="http://${ip}" target="_blank">UI</a>
+        <a class="node-link" href="http://${ip}/settings/wifi" target="_blank">WiFi</a>
+        <button class="node-remove" onclick="removeNode('${ip}')">×</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function toggleNode(ip,c){if(nodes[ip])nodes[ip]._sel=c;renderNodes();}
+function toggleSelectAll(){
+  const c=document.getElementById('selectAll').checked;
+  Object.values(nodes).forEach(n=>{if(n.online)n._sel=c;});
+  renderNodes();
+}
+function getSelected(){return Object.values(nodes).filter(n=>n._sel&&n.online);}
+function removeNode(ip){delete nodes[ip];saveNodes();renderNodes();}
+
+// ===== Batch send via /win =====
+async function batchWin(params, actionLabel = '应用') {
+  const sel = getSelected();
+  if (!sel.length) {
+    toast('请先勾选节点');
+    return { ok: 0, total: 0 };
+  }
+  log(`批量发送: ${params} → ${sel.length} 个节点`);
+  const results = await Promise.all(sel.map(n => winCmd(n.ip, params)));
+  const ok = results.filter(Boolean).length;
+  toast(`${actionLabel}：${ok}/${sel.length} 成功`);
+  // refresh states after a short delay (give WLED time to apply)
+  setTimeout(() => sel.forEach(n => probeNode(n.ip)), 500);
+  return { ok, total: sel.length };
+}
+
+function setPowerBusy(busy) {
+  document.getElementById('btnPowerOn').disabled = busy;
+  document.getElementById('btnPowerOff').disabled = busy;
+  document.getElementById('btnBootBlack').disabled = busy;
+}
+
+async function batchPower(on) {
+  const resultEl = document.getElementById('powerResult');
+  const params = on ? SAFE_POWER_ON : POWER_OFF;
+  const label = on ? '安全激活' : '关闭并清黑';
+  resultEl.className = 'power-result';
+  resultEl.textContent = `${label}中…`;
+  setPowerBusy(true);
+  try {
+    const result = await batchWin(params, label);
+    const complete = result.total > 0 && result.ok === result.total;
+    resultEl.className = `power-result ${complete ? 'ok' : 'fail'}`;
+    resultEl.textContent = result.total === 0
+      ? '请先勾选要控制的节点。'
+      : `${label}完成：${result.ok}/${result.total} 个节点成功。`;
+  } finally {
+    setPowerBusy(false);
+  }
+}
+
+async function batchBootBlack() {
+  const sel = getSelected();
+  const resultEl = document.getElementById('powerResult');
+  if (!sel.length) {
+    toast('请先勾选节点');
+    resultEl.className = 'power-result fail';
+    resultEl.textContent = '请先勾选要配置的节点。';
+    return;
+  }
+  if (!confirm('将关闭“上电自动亮灯”并清除启动预设，确保物理重启保持黑场。继续吗？')) return;
+  setPowerBusy(true);
+  resultEl.className = 'power-result';
+  resultEl.textContent = '正在固化上电黑场…';
+  try {
+    const results = await Promise.all(sel.map(async node => {
+      const configured = await postJson(node.ip, '/json/cfg', {def: {on: false, ps: 0}});
+      if (!configured) return false;
+      return winCmd(node.ip, POWER_OFF);
+    }));
+    const ok = results.filter(Boolean).length;
+    const complete = ok === sel.length;
+    resultEl.className = `power-result ${complete ? 'ok' : 'fail'}`;
+    resultEl.textContent = `上电黑场配置：${ok}/${sel.length} 个节点成功。`;
+    toast(`上电黑场：${ok}/${sel.length} 成功`);
+  } finally {
+    setPowerBusy(false);
+  }
+}
+
+// Send arbitrary /win param string
+function sendParam(p) { batchWin(p); }
+
+// ===== Effects =====
+function renderEffects() {
+  const grid = document.getElementById('fxGrid');
+  grid.innerHTML = '';
+  if (!effects) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:20px">请先在「节点」页扫描至少一个在线节点</div>';
+    return;
+  }
+  const q = document.getElementById('fxSearch').value.toLowerCase();
+  effects.forEach((name, i) => {
+    if (q && !name.toLowerCase().includes(q) && !String(i).includes(q)) return;
+    const div = document.createElement('div');
+    div.className = 'fx-item' + (i === activeFx ? ' active' : '');
+    div.innerHTML = `<span class="fx-id">${i}</span> ${esc(name)}`;
+    div.onclick = () => { activeFx = i; renderEffects(); batchWin(`FX=${i}`); };
+    grid.appendChild(div);
+  });
+}
+
+// ===== Palettes =====
+function renderPalettes() {
+  const grid = document.getElementById('palGrid');
+  grid.innerHTML = '';
+  if (!palettes) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:20px">请先在「节点」页扫描至少一个在线节点</div>';
+    return;
+  }
+  const q = document.getElementById('palSearch').value.toLowerCase();
+  palettes.forEach((name, i) => {
+    if (q && !name.toLowerCase().includes(q) && !String(i).includes(q)) return;
+    const div = document.createElement('div');
+    div.className = 'pal-item' + (i === activePal ? ' active' : '');
+    div.textContent = name;
+    div.onclick = () => { activePal = i; renderPalettes(); batchWin(`FP=${i}`); };
+    grid.appendChild(div);
+  });
+}
+
+// ===== Color =====
+function sendColor() {
+  const hex = document.getElementById('pickColor').value;
+  document.getElementById('hexColor').textContent = hex;
+  const r = parseInt(hex.substr(1,2),16);
+  const g = parseInt(hex.substr(3,2),16);
+  const b = parseInt(hex.substr(5,2),16);
+  // Set Solid effect + color in one call
+  batchWin(`FX=0&R=${r}&G=${g}&B=${b}`);
+  activeFx = 0;
+}
+
+function setBlack() {
+  document.getElementById('pickColor').value = '#000000';
+  sendColor();
+}
+
+// ========================================================================
+// ===== WiFi 批量修改：读回当前配置 → 覆盖 CS0/PW0 → 完整表单回填 POST =====
+// ========================================================================
+// 关键点：
+//  - WLED /settings/wifi 的 POST 是「缺字段=写空值」，只发 SSID+密码会把
+//    AP 热点(AS/AB/AP)、主机名(CM)、禁用休眠(WS)、发射功率(TX) 等一起清掉。
+//  - 因此先 GET /settings/s.js?p=1 读回当前所有值（密码是 **** 掩码），
+//    只覆盖 CS0=新SSID、PW0=新密码明文，其余原样回填。
+//  - 读不到当前配置的节点直接跳过、绝不盲推（防止清空热点）。
+//  - POST 之后节点离开当前网络，收不到回执是正常，发射后不管。
+
+function grab(re, txt, def){ const m = txt.match(re); return m !== null ? m[1] : def; }
+function unesc(s){ return s.replace(/\\"/g,'"').replace(/\\\\/g,'\\'); }
+
+// 读回单个节点的 WiFi 设置 JS（CORS 全局放行，可跨域读取）
+async function readWifiSettings(ip){
+  const r = await fetchTimeout(`http://${ip}/settings/s.js?p=1`, 3000);
+  if (!r || !r.ok) return null;
+  let txt;
+  try { txt = await r.text(); } catch(e){ return null; }
+  // PIN 锁定时返回 alert(...)，没有真正的表单值
+  if (!/addWiFi\s*\(/.test(txt) || !/d\.Sf\.AS\./.test(txt)) return null;
+  return txt;
+}
+
+// 用读回的当前值构造「完整表单」，只把 network0 换成新 WiFi
+function buildWifiBody(txt, newSSID, newPass){
+  const p = new URLSearchParams();
+
+  // 现有客户端网络（little-endian hex）：network0 覆盖为新 WiFi，其余原样保留
+  const re = /addWiFi\("((?:[^"\\]|\\.)*)","((?:[^"\\]|\\.)*)",(0x[0-9a-fA-F]+),(0x[0-9a-fA-F]+),(0x[0-9a-fA-F]+)\)/g;
+  const nets = [...txt.matchAll(re)];
+
+  p.set('CS0', newSSID);
+  p.set('PW0', newPass);          // 明文 → 设为新密码；不发 IP0x 字段 = DHCP
+  for (let n = 1; n < nets.length; n++){   // 保留额外网络（掩码密码 → 保持不变）
+    p.set('CS'+n, unesc(nets[n][1]));
+    p.set('PW'+n, nets[n][2]);
+  }
+
+  // 需要原样保留的 AP / mDNS / 其它字段
+  const CM = grab(/d\.Sf\.CM\.value="((?:[^"\\]|\\.)*)"/, txt, '');
+  const AS = grab(/d\.Sf\.AS\.value="((?:[^"\\]|\\.)*)"/, txt, '');
+  const AP = grab(/d\.Sf\.AP\.value="((?:[^"\\]|\\.)*)"/, txt, '');   // "****" → 保留 AP 密码
+  const AB = grab(/d\.Sf\.AB\.selectedIndex=(\d+)/, txt, '2');        // AP 行为（2=常开）
+  const AC = grab(/d\.Sf\.AC\.value=(\d+)/, txt, '1');                // AP 信道
+  p.set('CM', unesc(CM));
+  p.set('AS', unesc(AS));
+  p.set('AP', AP);
+  p.set('AB', AB);
+  p.set('AC', AC);
+
+  // 复选框：checked=1 才带上（WLED 用 hasArg 判断）
+  if (grab(/d\.Sf\.AH\.checked=(\d+)/, txt, '0') === '1') p.set('AH','on');  // 隐藏 AP
+  if (grab(/d\.Sf\.WS\.checked=(\d+)/, txt, '0') === '1') p.set('WS','on');  // 禁用 WiFi 休眠（声音同步需要）
+  if (grab(/d\.Sf\.FG\.checked=(\d+)/, txt, '0') === '1') p.set('FG','on');  // 强制 802.11g
+  if (grab(/d\.Sf\.RE\.checked=(\d+)/, txt, '0') === '1') p.set('RE','on');  // ESP-NOW
+  const RMAC = grab(/d\.Sf\.RMAC\.value="((?:[^"\\]|\\.)*)"/, txt, '');
+  if (RMAC) p.set('RMAC', unesc(RMAC));
+  const TX = grab(/d\.Sf\.TX\.value=(\d+)/, txt, '');                        // 发射功率（ESP32），漏了会掉到最低
+  if (TX !== '') p.set('TX', TX);
+
+  return p.toString();
+}
+
+// 发送 WiFi 表单（发射后不管：节点保存后离网，回执大概率收不到，超时不算失败）
+async function postWifi(ip, body){
+  const ac = new AbortController();
+  const tm = setTimeout(() => ac.abort(), 4000);
+  try {
+    const r = await fetch(`http://${ip}/settings/wifi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body, signal: ac.signal
+    });
+    clearTimeout(tm); return r.status;   // 常见会回 200
+  } catch(e) { clearTimeout(tm); return 0; }  // 超时/断连 = 已发送但无回执
+}
+
+async function pushWifi(){
+  const ssid = document.getElementById('wfSsid').value.trim();
+  const pass = document.getElementById('wfPass').value;
+  if (!ssid) { toast('请输入新 WiFi 名称'); return; }
+  if (pass.length > 0 && pass.length < 8) { toast('WPA2 密码至少 8 位'); return; }
+
+  const sel = getSelected();
+  if (!sel.length) { toast('请先在「节点」页勾选要修改的节点'); return; }
+
+  if (!confirm(
+    `确认把选中的 ${sel.length} 个节点的 WiFi 改为「${ssid}」？\n\n` +
+    `· 它们会离开当前网络去连新 WiFi，不会自动回到本页。\n` +
+    `· 请确认新 WiFi / 板子 AP 已经起好、能连上。\n` +
+    `· 读不到配置的节点会自动跳过、不修改。`
+  )) return;
+
+  const box = document.getElementById('wfResults');
+  box.innerHTML = '';
+  const btn = document.getElementById('btnPushWifi');
+  btn.disabled = true;
+  log(`===== 批量改 WiFi → "${ssid}" (${sel.length} 个节点) =====`);
+
+  let okCnt = 0, skipCnt = 0;
+  for (const n of sel){
+    const line = document.createElement('div');
+    line.className = 'wf-line';
+    line.textContent = `${n.name} (${n.ip})：读取当前配置…`;
+    box.appendChild(line);
+
+    const txt = await readWifiSettings(n.ip);
+    if (!txt){
+      line.className = 'wf-line wf-skip';
+      line.textContent = `✗ ${n.name} (${n.ip})：读不到配置（离线 / 设了 PIN？）— 已跳过，未做任何修改`;
+      log(`✗ ${n.ip} 读取失败，跳过`);
+      skipCnt++;
+      continue;
+    }
+
+    const body = buildWifiBody(txt, ssid, pass);
+    line.textContent = `${n.name} (${n.ip})：推送中…`;
+    log(`→ ${n.ip} POST ${body.replace(/PW\d+=[^&]*/g, m => m.split('=')[0]+'=***')}`);
+
+    const st = await postWifi(n.ip, body);
+    line.className = 'wf-line wf-done';
+    if (st === 200)
+      line.textContent = `✓ ${n.name} (${n.ip})：已保存 — 正在切到「${ssid}」，请到新网络验证`;
+    else
+      line.textContent = `→ ${n.name} (${n.ip})：已发送（无回执，正常）— 请到新网络验证`;
+    log(`✓ ${n.ip} 已推送 (status ${st})`);
+    okCnt++;
+
+    if (nodes[n.ip]) { nodes[n.ip].online = false; nodes[n.ip]._sel = false; }  // 它离网了
+  }
+
+  renderNodes();
+  btn.disabled = false;
+  toast(`完成：${okCnt} 已推送，${skipCnt} 跳过`);
+  const note = document.createElement('div');
+  note.className = 'wf-line';
+  note.style.borderColor = 'var(--accent)';
+  note.innerHTML = `<b style="color:var(--accent)">下一步：</b>把这台电脑也切到「${esc(ssid)}」，在「节点」页把子网前缀改成新网段后重新扫描，确认节点都回来了。`;
+  box.appendChild(note);
+}
+
+// ===== Init =====
+document.getElementById('manualIp').addEventListener('keydown', e => { if(e.key==='Enter') addManual(); });
+document.getElementById('subnet').addEventListener('keydown', e => { if(e.key==='Enter') scanSubnet(); });
+window.addEventListener('DOMContentLoaded', () => {
+  loadNodes();
+  setInterval(() => { Object.keys(nodes).forEach(ip => probeNode(ip)); }, 30000);
+});
+</script>
+</body>
+</html>
