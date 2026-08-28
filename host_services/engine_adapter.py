@@ -253,24 +253,63 @@ def _live_position_ms() -> int:
 
 
 def _push_brightness_scale() -> None:
-    """Send current brightness_scale to all WLED nodes (fire-and-forget)."""
+    """Safely enable WLED at local black, then apply current brightness."""
     from . import wled_brightness
     scale = _state["brightness_scale"]
-    hosts_devices = [d for d in _devices if d.get("host") and d.get("enabled", True) and d.get("device_type") == WLED_DEVICE_TYPE]
+    hosts_devices = _enabled_wled_devices()
     if hosts_devices:
         wled_brightness.apply_scale(hosts_devices, scale, WLED_HTTP_TIMEOUT_S)
 
 
 def _push_wled_off() -> None:
-    """停止播放时把节点本地状态关掉。
-
-    DDP 停流后 WLED 退出 realtime 会回落到本地状态（出厂默认 = 开 + 琥珀色），
-    表现为节目结束后灯带全黄。显式发 {"on": false} 消掉这个回落。
-    """
+    """Stop WLED with a black local fallback for the realtime timeout."""
     from . import wled_brightness
-    hosts_devices = [d for d in _devices if d.get("host") and d.get("enabled", True) and d.get("device_type") == WLED_DEVICE_TYPE]
+    hosts_devices = _enabled_wled_devices()
     if hosts_devices:
         wled_brightness.apply_off(hosts_devices, WLED_HTTP_TIMEOUT_S)
+
+
+_wled_boot_policy_hosts: set[str] = set()
+_wled_boot_policy_lock = threading.Lock()
+
+
+def _enabled_wled_devices() -> list[dict]:
+    return [
+        device for device in _devices
+        if device.get("host")
+        and device.get("enabled", True)
+        and device.get("device_type") == WLED_DEVICE_TYPE
+    ]
+
+
+def initialize_wled_safe_state(*, force_off: bool = False) -> dict[str, bool]:
+    """Provision cold-boot black once per resolved WLED host.
+
+    ``force_off`` is used only at Host startup.  Deferred mDNS retries provision
+    newly reachable boards without interrupting playback already in progress.
+    """
+    if ENGINE_ADAPTER != "real":
+        return {}
+    from . import wled_brightness
+
+    hosts_devices = _enabled_wled_devices()
+    with _wled_boot_policy_lock:
+        pending = [
+            device for device in hosts_devices
+            if device["host"] not in _wled_boot_policy_hosts
+        ]
+        results = wled_brightness.apply_black_boot_policy(
+            pending, WLED_HTTP_TIMEOUT_S
+        ) if pending else {}
+        _wled_boot_policy_hosts.update(
+            host for host, success in results.items() if success
+        )
+    failed = [host for host, success in results.items() if not success]
+    if failed:
+        _log.warning("WLED black boot policy not confirmed for: %s", ", ".join(failed))
+    if force_off and hosts_devices:
+        wled_brightness.apply_off(hosts_devices, WLED_HTTP_TIMEOUT_S)
+    return results
 
 
 import urllib.request
@@ -1173,6 +1212,7 @@ def _deferred_re_resolve() -> None:
                     attempt,
                     ", ".join(f"{k}: {old_hosts[k]} -> {new_hosts.get(k)}" for k in changed),
                 )
+            initialize_wled_safe_state()
             unresolved = [k for k, v in new_hosts.items()
                           if not v or str(v).endswith(".local")]
             if not unresolved:
