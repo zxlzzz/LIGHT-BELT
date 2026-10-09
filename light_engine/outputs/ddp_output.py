@@ -177,7 +177,7 @@ class DdpOutput(LightOutput):
         else:
             source_pixels = digital_frame.pixels
 
-        return [(_to_u8(red), _to_u8(green), _to_u8(blue)) for red, green, blue in source_pixels]
+        return [(255, 160, 0) if _to_u8(max(red, green, blue)) else (0, 0, 0) for red, green, blue in source_pixels]
 
     def _send_datagram(self, packet: bytes, address: tuple[str, int]) -> None:
         if self.mode is OutputMode.FAKE:
